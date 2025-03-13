@@ -119,13 +119,37 @@
     {{-- Extra Configured Plugins Scripts --}}
     @include('adminlte::plugins', ['type' => 'js'])
 
+    @php( $datatablesIsEnabled = View::getSection('plugins.Datatables'))
+    @if ($datatablesIsEnabled)
+    <script>
+        DataTable.render.toLocaleTimeString = function (data, type) {
+            return function (data, type) {
+                const options = { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                if (type === 'display' || type === 'filter') {
+                    return data
+                        ? new Date(data).toLocaleTimeString('es-AR', options)
+                        : "";
+                }
+                return data;
+            };
+        };
+        DataTable.render.toLocaleString = function (data, type) {
+            return function (data, type) {
+                const options = { year: '2-digit', month: '2-digit', day: '2-digit'};
+                if (type === 'display' || type === 'filter') {
+                    return data
+                        ? new Date(data).toLocaleString('es-AR', options)
+                        : "";
+                }
+                return data;
+            };
+        };
+    </script>
+    @endif
+
     {{-- Livewire Script --}}
     @if(config('adminlte.livewire'))
-        @if(intval(app()->version()) >= 7)
-            @livewireScripts
-        @else
-            <livewire:scripts />
-        @endif
+        @livewireScripts
     @endif
 
     {{-- Custom Scripts --}}

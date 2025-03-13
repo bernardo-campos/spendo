@@ -16,7 +16,7 @@
 @section('auth_header', __('adminlte::adminlte.register_message'))
 
 @section('auth_body')
-    <form action="{{ $registerUrl }}" method="post">
+    <form class="without-confirmation" action="{{ $registerUrl }}" method="post">
         @csrf
 
         {{-- Name field --}}

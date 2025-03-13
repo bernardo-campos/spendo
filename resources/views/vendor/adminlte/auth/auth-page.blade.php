@@ -87,4 +87,5 @@
 @section('adminlte_js')
     @stack('js')
     @yield('js')
+    @include('scripts.disableBtnSubmit')
 @stop

@@ -1,12 +1,12 @@
 @extends('adminlte::auth.auth-page', ['authType' => 'login'])
 
 @php
-    $passEmailUrl = View::getSection('password_email_url') ?? config('adminlte.password_email_url', 'password/email');
+    $password_reset_url = View::getSection('password_reset_url') ?? config('adminlte.password_reset_url', 'password/email');
 
     if (config('adminlte.use_route_url', false)) {
-        $passEmailUrl = $passEmailUrl ? route($passEmailUrl) : '';
+        $password_reset_url = $password_reset_url ? route($password_reset_url) : '';
     } else {
-        $passEmailUrl = $passEmailUrl ? url($passEmailUrl) : '';
+        $password_reset_url = $password_reset_url ? url($password_reset_url) : '';
     }
 @endphp
 
@@ -20,13 +20,13 @@
         </div>
     @endif
 
-    <form action="{{ $passEmailUrl }}" method="post">
+    <form class="without-confirmation" action="{{ $password_reset_url }}" method="post">
         @csrf
 
         {{-- Email field --}}
         <div class="input-group mb-3">
             <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
-                value="{{ old('email') }}" placeholder="{{ __('adminlte::adminlte.email') }}" autofocus>
+                value="{{ old('email', request()->email) }}" placeholder="{{ __('adminlte::adminlte.email') }}" autofocus>
 
             <div class="input-group-append">
                 <div class="input-group-text">

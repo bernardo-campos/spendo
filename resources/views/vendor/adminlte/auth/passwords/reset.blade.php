@@ -13,7 +13,7 @@
 @section('auth_header', __('adminlte::adminlte.password_reset_message'))
 
 @section('auth_body')
-    <form action="{{ $passResetUrl }}" method="post">
+    <form class="without-confirmation" action="{{ $passResetUrl }}" method="post">
         @csrf
 
         {{-- Token field --}}

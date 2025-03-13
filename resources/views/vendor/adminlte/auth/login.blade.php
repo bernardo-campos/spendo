@@ -23,7 +23,7 @@
 @section('auth_header', __('adminlte::adminlte.login_message'))
 
 @section('auth_body')
-    <form action="{{ $loginUrl }}" method="post">
+    <form class="without-confirmation" action="{{ $loginUrl }}" method="post">
         @csrf
 
         {{-- Email field --}}

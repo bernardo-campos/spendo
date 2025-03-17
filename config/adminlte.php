@@ -14,7 +14,7 @@ return [
     |
     */
 
-    'title' => 'AdminLTE 3',
+    'title' => config('app.name'),
     'title_prefix' => '',
     'title_postfix' => '',
 
@@ -317,6 +317,11 @@ return [
             'text'      => 'Categorias',
             'route'     => 'categories.index',
             'icon'      => 'far fa-fw fa-list-alt',
+        ],
+        [
+            'text'      => 'Etiquetas',
+            'route'     => 'tags.index',
+            'icon'      => 'fas fa-fw fa-tags',
         ],
     ],
 

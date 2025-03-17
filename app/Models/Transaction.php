@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasCurrentUserScope;
 use Illuminate\Database\Eloquent\Model;
 
 class Transaction extends Model
 {
+    use HasCurrentUserScope;
+
     protected $fillable = [
         'user_id',
         'category_id',
@@ -14,6 +17,10 @@ class Transaction extends Model
         'date',
         'description',
         'type',
+    ];
+
+    protected $casts = [
+        'type' => \App\Enums\TransactionType::class,
     ];
 
     // Scopes opcionales para facilitar consultas
@@ -25,11 +32,6 @@ class Transaction extends Model
     public function scopeExpense($query)
     {
         return $query->where('type', 'expense');
-    }
-
-    public function scopeCurrentUser($query)
-    {
-        return $query->where('user_id', auth()->id());
     }
 
     /* ----- Relaciones ----- */

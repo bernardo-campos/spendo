@@ -313,6 +313,11 @@ return [
             'can'       => 'users.index',
             'key'       => 'users',
         ],
+        [
+            'text'      => 'Categorias',
+            'route'     => 'categories.index',
+            'icon'      => 'far fa-fw fa-list-alt',
+        ],
     ],
 
     /*

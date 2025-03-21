@@ -22,7 +22,14 @@
 <script>
 
     $(() => {
-        $('#{{ $id }}').select2( @json($config) );
+        $('#{{ $id }}').select2( {
+            ...@json($config),
+            ...{
+                language: {
+                  noResults: () => 'No se encontraron resultados',
+                }
+            }
+        } ).val(null).trigger( 'change');
 
         // Add support to auto select old submitted values in case of
         // validation errors.
@@ -43,6 +50,25 @@
     })
 
 </script>
+@once
+<script type="text/javascript">
+    {{-- https://forums.select2.org/t/search-being-unfocused/1203/10 --}}
+    // hack to fix jquery 3.6 focus security patch that bugs auto search in select-2
+    $(document).on('select2:open', () => {
+        document.querySelector('.select2-search__field').focus();
+    });
+
+    $(document).on('focus', '.select2-selection.select2-selection--single', function (e) {
+        $(this).closest(".select2-container").siblings('select:enabled').select2('open');
+    });
+
+    $('select.select2').on('select2:closing', function (e) {
+    $(e.target).data("select2").$selection.one('focus focusin', function (e) {
+        e.stopPropagation();
+    });
+    });
+</script>
+@endonce
 @endpush
 
 {{-- CSS workarounds for the Select2 plugin --}}

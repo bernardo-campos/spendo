@@ -16,6 +16,7 @@ const savingTransaction = ref(false);
 const savingCategory = ref(false);
 const savingTag = ref(false);
 const savingCard = ref(false);
+const savingBillingCycle = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 
@@ -61,6 +62,8 @@ const cardForm = ref({
     due_day: '',
     is_active: true,
 });
+
+const billingCycleForms = ref({});
 
 const normalizeSlug = (value) => value
     .trim()
@@ -113,6 +116,17 @@ const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
         return null;
     }
 
+    const purchaseDateValue = formatDateParts(purchase);
+    const billingCycles = Array.isArray(card.billing_cycles)
+        ? [...card.billing_cycles].sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)))
+        : [];
+
+    const matchedCycle = billingCycles.find((cycle) => String(cycle.closing_date) >= purchaseDateValue);
+
+    if (matchedCycle?.due_date) {
+        return matchedCycle.due_date;
+    }
+
     const closingDay = Number(card.closing_day) || 1;
     const dueDay = Number(card.due_day) || closingDay;
 
@@ -130,12 +144,35 @@ const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
     });
 };
 
+const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
+    const purchase = toDateParts(purchaseDate);
+
+    if (purchase === null || card === null) {
+        return false;
+    }
+
+    const purchaseDateValue = formatDateParts(purchase);
+    const billingCycles = Array.isArray(card.billing_cycles)
+        ? card.billing_cycles
+        : [];
+
+    return billingCycles.some((cycle) => String(cycle.closing_date) >= purchaseDateValue);
+};
+
 const firstInstallmentPaymentDate = computed(() => {
     if (!isCreditPayment.value || selectedCard.value === null) {
         return null;
     }
 
     return calculateFirstInstallmentPaymentDate(form.value.purchase_date, selectedCard.value);
+});
+
+const firstInstallmentPaymentDateIsEstimated = computed(() => {
+    if (!isCreditPayment.value || selectedCard.value === null) {
+        return false;
+    }
+
+    return !hasRealCycleForPurchaseDate(form.value.purchase_date, selectedCard.value);
 });
 
 const isInSelectedPeriod = (dateValue) => {
@@ -440,6 +477,61 @@ const resetCardForm = () => {
     cardForm.value.closing_day = '';
     cardForm.value.due_day = '';
     cardForm.value.is_active = true;
+};
+
+const getBillingCycleForm = (cardId) => {
+    if (!billingCycleForms.value[cardId]) {
+        billingCycleForms.value[cardId] = {
+            id: null,
+            closing_date: '',
+            due_date: '',
+        };
+    }
+
+    return billingCycleForms.value[cardId];
+};
+
+const resetBillingCycleForm = (cardId) => {
+    const cycleForm = getBillingCycleForm(cardId);
+    cycleForm.id = null;
+    cycleForm.closing_date = '';
+    cycleForm.due_date = '';
+};
+
+const editBillingCycle = (cardId, cycle) => {
+    const cycleForm = getBillingCycleForm(cardId);
+    cycleForm.id = cycle.id;
+    cycleForm.closing_date = cycle.closing_date;
+    cycleForm.due_date = cycle.due_date;
+};
+
+const submitBillingCycle = async (cardId) => {
+    savingBillingCycle.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const cycleForm = getBillingCycleForm(cardId);
+        const payload = {
+            closing_date: cycleForm.closing_date,
+            due_date: cycleForm.due_date,
+        };
+
+        if (cycleForm.id === null) {
+            await window.axios.post(`/api/cards/${cardId}/billing-cycles`, payload);
+            successMessage.value = 'Ciclo de facturación creado correctamente.';
+        } else {
+            await window.axios.put(`/api/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
+            successMessage.value = 'Ciclo de facturación actualizado correctamente.';
+        }
+
+        resetBillingCycleForm(cardId);
+        await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar el ciclo de facturación.';
+    } finally {
+        savingBillingCycle.value = false;
+    }
 };
 
 const submitTransaction = async () => {
@@ -806,7 +898,8 @@ const removeCard = async (cardId) => {
                         </label>
 
                         <p v-if="firstInstallmentPaymentDate" class="text-xs text-slate-500 dark:text-slate-400">
-                            La primera cuota se pagará el {{ formatDate(firstInstallmentPaymentDate) }}.
+                            La primera cuota se pagará el {{ formatDate(firstInstallmentPaymentDate) }}
+                            {{ firstInstallmentPaymentDateIsEstimated ? '(fecha estimada)' : '(fecha real por ciclo cargado)' }}.
                         </p>
 
                         <label v-if="isCreditPayment" class="space-y-1 text-sm">
@@ -862,14 +955,42 @@ const removeCard = async (cardId) => {
                     </form>
 
                     <ul class="mt-4 space-y-2">
-                        <li v-for="card in cards" :key="card.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                            <div>
-                                <p class="font-medium">{{ card.name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">****{{ card.last_four_digits }} · Cierre {{ card.closing_day }} · Vence {{ card.due_day }}</p>
+                        <li v-for="card in cards" :key="card.id" class="rounded-md border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-medium">{{ card.name }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">****{{ card.last_four_digits }} · Cierre estimado {{ card.closing_day }} · Vence estimado {{ card.due_day }}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editCard(card)">Editar</button>
+                                    <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="removeCard(card.id)">Eliminar</button>
+                                </div>
                             </div>
-                            <div class="flex gap-2">
-                                <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editCard(card)">Editar</button>
-                                <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="removeCard(card.id)">Eliminar</button>
+
+                            <div class="mt-3 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+                                <p class="mb-2 text-xs font-medium text-slate-600 dark:text-slate-300">Ciclos de facturación (reales)</p>
+
+                                <p v-if="!Array.isArray(card.billing_cycles) || card.billing_cycles.length === 0" class="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                                    No hay ciclos cargados para esta tarjeta.
+                                </p>
+
+                                <ul v-else class="mb-3 space-y-1">
+                                    <li v-for="cycle in card.billing_cycles" :key="cycle.id" class="flex items-center justify-between rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700">
+                                        <span>Cierre {{ formatDate(cycle.closing_date) }} · Vence {{ formatDate(cycle.due_date) }}</span>
+                                        <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editBillingCycle(card.id, cycle)">Editar ciclo</button>
+                                    </li>
+                                </ul>
+
+                                <form class="grid gap-2 sm:grid-cols-3" @submit.prevent="submitBillingCycle(card.id)">
+                                    <input v-model="getBillingCycleForm(card.id).closing_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                                    <input v-model="getBillingCycleForm(card.id).due_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                                    <div class="flex gap-2">
+                                        <button type="submit" :disabled="savingBillingCycle" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+                                            {{ getBillingCycleForm(card.id).id === null ? 'Agregar ciclo' : 'Actualizar ciclo' }}
+                                        </button>
+                                        <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-xs dark:border-slate-700" @click="resetBillingCycleForm(card.id)">Limpiar</button>
+                                    </div>
+                                </form>
                             </div>
                         </li>
                     </ul>

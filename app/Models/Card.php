@@ -49,4 +49,9 @@ class Card extends Model
     {
         return $this->hasMany(InstallmentPlan::class);
     }
+
+    public function billingCycles(): HasMany
+    {
+        return $this->hasMany(CardBillingCycle::class);
+    }
 }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Installment extends Model
+class CardBillingCycle extends Model
 {
     use HasFactory;
 
@@ -14,13 +14,9 @@ class Installment extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'installment_plan_id',
-        'installment_number',
-        'amount',
+        'card_id',
+        'closing_date',
         'due_date',
-        'due_date_is_estimated',
-        'paid_at',
-        'status',
     ];
 
     /**
@@ -29,16 +25,13 @@ class Installment extends Model
     protected function casts(): array
     {
         return [
-            'installment_number' => 'integer',
-            'amount' => 'decimal:2',
+            'closing_date' => 'date',
             'due_date' => 'date',
-            'due_date_is_estimated' => 'boolean',
-            'paid_at' => 'date',
         ];
     }
 
-    public function installmentPlan(): BelongsTo
+    public function card(): BelongsTo
     {
-        return $this->belongsTo(InstallmentPlan::class);
+        return $this->belongsTo(Card::class);
     }
 }

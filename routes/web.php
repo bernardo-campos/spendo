@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CardBillingCycleController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
@@ -30,6 +31,8 @@ Route::middleware('auth')->prefix('api')->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('tags', TagController::class);
     Route::apiResource('cards', CardController::class);
+    Route::apiResource('cards.billing-cycles', CardBillingCycleController::class)
+        ->parameters(['billing-cycles' => 'billingCycle']);
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
 });

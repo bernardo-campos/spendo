@@ -8,7 +8,7 @@ use Carbon\CarbonImmutable;
 class InstallmentPlanService
 {
     /**
-     * @return list<array{installment_number:int, amount:string, due_date:string, status:string}>
+     * @return list<array{installment_number:int, amount:string, due_date:string, due_date_is_estimated:bool, status:string}>
      */
     public function buildInstallments(
         string $totalAmount,
@@ -32,6 +32,7 @@ class InstallmentPlanService
                 'installment_number' => $index,
                 'amount' => number_format($amountCents / 100, 2, '.', ''),
                 'due_date' => $date->addMonthsNoOverflow($index - 1)->toDateString(),
+                'due_date_is_estimated' => true,
                 'status' => 'pending',
             ];
 

@@ -18,6 +18,7 @@ class CardController extends Controller
 
         $cards = Card::query()
             ->where('user_id', $user->id)
+            ->with(['billingCycles' => fn ($query) => $query->orderBy('closing_date')])
             ->orderBy('name')
             ->get();
 
@@ -38,7 +39,7 @@ class CardController extends Controller
     {
         abort_unless($card->user_id === $request->user()?->id, 404);
 
-        return response()->json($card);
+        return response()->json($card->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]));
     }
 
     public function update(UpdateCardRequest $request, Card $card): JsonResponse
@@ -47,7 +48,7 @@ class CardController extends Controller
 
         $card->update($request->validated());
 
-        return response()->json($card->fresh());
+        return response()->json($card->fresh()->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]));
     }
 
     public function destroy(Request $request, Card $card): JsonResponse

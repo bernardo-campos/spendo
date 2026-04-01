@@ -8,40 +8,20 @@ use App\Http\Requests\UpdateTransactionRequest;
 use App\Models\Card;
 use App\Models\InstallmentPlan;
 use App\Models\Transaction;
+use App\Services\CardPaymentDateService;
+use App\Services\InstallmentDueDateSyncService;
 use App\Services\InstallmentPlanService;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class TransactionController extends Controller
 {
-    public function __construct(private InstallmentPlanService $installmentPlanService) {}
-
-    private function resolvePaymentDate(
-        string $purchaseDate,
-        string $paymentMethod,
-        ?Card $card,
-    ): string {
-        $purchase = CarbonImmutable::parse($purchaseDate);
-
-        if ($paymentMethod !== PaymentMethodType::Credit->value || $card === null) {
-            return $purchase->toDateString();
-        }
-
-        $closingDay = $card->closing_day ?? 1;
-        $dueDay = $card->due_day ?? $closingDay;
-
-        $statementMonth = $purchase->day <= $closingDay
-            ? $purchase->startOfMonth()
-            : $purchase->addMonthNoOverflow()->startOfMonth();
-
-        $dueMonth = $statementMonth->addMonthNoOverflow();
-        $lastDayOfDueMonth = $dueMonth->endOfMonth()->day;
-        $safeDueDay = min($dueDay, $lastDayOfDueMonth);
-
-        return $dueMonth->setDay($safeDueDay)->toDateString();
-    }
+    public function __construct(
+        private InstallmentPlanService $installmentPlanService,
+        private CardPaymentDateService $cardPaymentDateService,
+        private InstallmentDueDateSyncService $installmentDueDateSyncService,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -84,6 +64,18 @@ class TransactionController extends Controller
                 }
             }
 
+            $paymentDate = $validated['purchase_date'];
+
+            if ($validated['type'] === 'expense') {
+                $resolvedPaymentDate = $this->cardPaymentDateService->resolve(
+                    $validated['purchase_date'],
+                    $paymentMethod ?? PaymentMethodType::Cash->value,
+                    $card,
+                );
+
+                $paymentDate = $resolvedPaymentDate['date'];
+            }
+
             $transaction = Transaction::query()->create([
                 'user_id' => $user->id,
                 'category_id' => $validated['category_id'] ?? null,
@@ -93,9 +85,7 @@ class TransactionController extends Controller
                 'description' => $validated['description'],
                 'amount' => $validated['amount'],
                 'purchase_date' => $validated['purchase_date'],
-                'payment_date' => $validated['type'] === 'expense'
-                    ? $this->resolvePaymentDate($validated['purchase_date'], $paymentMethod ?? PaymentMethodType::Cash->value, $card)
-                    : $validated['purchase_date'],
+                'payment_date' => $paymentDate,
                 'notes' => $validated['notes'] ?? null,
             ]);
 
@@ -126,6 +116,8 @@ class TransactionController extends Controller
                         $transaction->payment_date->toDateString(),
                     )
                 );
+
+                $this->installmentDueDateSyncService->syncPlan($plan->fresh(['transaction', 'installments']));
             }
 
             return $transaction;
@@ -166,11 +158,13 @@ class TransactionController extends Controller
                 ->firstOrFail();
 
             if (isset($validated['purchase_date']) || isset($validated['payment_method']) || isset($validated['card_id'])) {
-                $validated['payment_date'] = $this->resolvePaymentDate(
+                $resolvedPaymentDate = $this->cardPaymentDateService->resolve(
                     $validated['purchase_date'] ?? $transaction->purchase_date->toDateString(),
                     PaymentMethodType::Credit->value,
                     $card,
                 );
+
+                $validated['payment_date'] = $resolvedPaymentDate['date'];
             }
         }
 
@@ -179,6 +173,10 @@ class TransactionController extends Controller
         }
 
         $transaction->update($validated);
+
+        if ($transaction->payment_method === PaymentMethodType::Credit->value && $transaction->installmentPlan !== null) {
+            $this->installmentDueDateSyncService->syncPlan($transaction->installmentPlan->fresh(['transaction', 'installments']));
+        }
 
         if ($request->has('tag_ids')) {
             $transaction->tags()->sync($request->validated('tag_ids', []));

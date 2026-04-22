@@ -498,11 +498,19 @@ const resetBillingCycleForm = (cardId) => {
     cycleForm.due_date = '';
 };
 
+const toInputDateValue = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    return String(value).slice(0, 10);
+};
+
 const editBillingCycle = (cardId, cycle) => {
     const cycleForm = getBillingCycleForm(cardId);
     cycleForm.id = cycle.id;
-    cycleForm.closing_date = cycle.closing_date;
-    cycleForm.due_date = cycle.due_date;
+    cycleForm.closing_date = toInputDateValue(cycle.closing_date);
+    cycleForm.due_date = toInputDateValue(cycle.due_date);
 };
 
 const submitBillingCycle = async (cardId) => {

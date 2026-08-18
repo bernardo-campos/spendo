@@ -12,8 +12,10 @@
 ```text
 resources/
   css/app.css                         Tailwind v4 imports and theme tokens
-  js/
+    js/
     app.js                             Vue entry point
+    composables/
+      useTransactions.js               Consulta, caché y proyecciones por período
     components/
       SpendoApp.vue                    State, HTTP, forms, active screen flow
       admin/
@@ -27,6 +29,8 @@ resources/
       TagsPage.vue                     Administración de etiquetas
       TransactionFormPage.vue          Formulario de ingresos y egresos
       TransactionListPage.vue          Reusable income/expense list
+    utils/
+      cardPaymentDates.js              Cálculos puros de fechas de cuotas
 ```
 
 ## UI conventions
@@ -36,6 +40,9 @@ resources/
   persistence, sidebar visibility, user-menu state, data loading, mutation
   handlers, and error/success messages. Resource screens receive state through
   props and emit user actions back to this coordinator.
+- `useTransactions` encapsulates `/transactions?period=YYYY-MM`, its cache del
+  período activo, loading state, normalización de cuotas y totales. Las fechas
+  de pago estimadas y el uso de ciclos reales viven en `cardPaymentDates.js`.
 - `AdminHeader` renders the single month selector. Dashboard, income, and expense
   pages consume the filtered data and must not render a second period selector.
 - Existing pages receive data via props and emit actions such as

@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useTransactions } from '../composables/useTransactions';
+import { calculateFirstInstallmentPaymentDate, hasRealCycleForPurchaseDate } from '../utils/cardPaymentDates';
 import AdminLayout from './admin/AdminLayout.vue';
 import CardsPage from '../pages/CardsPage.vue';
 import CategoriesPage from '../pages/CategoriesPage.vue';
@@ -14,7 +16,6 @@ const currencySymbol = rootElement?.dataset.currencySymbol ?? '$';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
 const loading = ref(false);
-const transactionsLoading = ref(false);
 const activeScreen = ref('dashboard');
 const forcedTransactionType = ref(null);
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
@@ -44,8 +45,16 @@ const CATEGORY_SCOPE_LABELS = {
 const categories = ref([]);
 const tags = ref([]);
 const cards = ref([]);
-const transactions = ref([]);
-const loadedTransactionsPeriod = ref(null);
+const {
+    dashboardRecentTransactions,
+    expenseTotal,
+    expenseTransactions,
+    incomeTotal,
+    incomeTransactions,
+    invalidateTransactions,
+    loadTransactions,
+    transactionsLoading,
+} = useTransactions(selectedPeriod);
 
 const userInitials = computed(() => userName
     .split(' ')
@@ -114,78 +123,6 @@ const selectedCard = computed(() => cards.value.find((card) => Number(card.id) =
 
 const showInstallments = computed(() => isCreditPayment.value && Number(form.value.installments_count) > 1);
 
-const toDateParts = (value) => {
-    const [year, month, day] = String(value).split('-').map((part) => Number.parseInt(part, 10));
-
-    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-        return null;
-    }
-
-    return { year, month, day };
-};
-
-const formatDateParts = ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-const addMonthNoOverflow = ({ year, month }) => {
-    if (month === 12) {
-        return { year: year + 1, month: 1 };
-    }
-
-    return { year, month: month + 1 };
-};
-
-const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
-
-const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-
-    if (purchase === null || card === null) {
-        return null;
-    }
-
-    const purchaseDateValue = formatDateParts(purchase);
-    const billingCycles = Array.isArray(card.billing_cycles)
-        ? [...card.billing_cycles].sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)))
-        : [];
-
-    const matchedCycle = billingCycles.find((cycle) => String(cycle.closing_date) >= purchaseDateValue);
-
-    if (matchedCycle?.due_date) {
-        return matchedCycle.due_date;
-    }
-
-    const closingDay = Number(card.closing_day) || 1;
-    const dueDay = Number(card.due_day) || closingDay;
-
-    const statementMonth = purchase.day <= closingDay
-        ? { year: purchase.year, month: purchase.month }
-        : addMonthNoOverflow({ year: purchase.year, month: purchase.month });
-
-    const dueMonth = addMonthNoOverflow(statementMonth);
-    const safeDueDay = Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month));
-
-    return formatDateParts({
-        year: dueMonth.year,
-        month: dueMonth.month,
-        day: safeDueDay,
-    });
-};
-
-const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-
-    if (purchase === null || card === null) {
-        return false;
-    }
-
-    const purchaseDateValue = formatDateParts(purchase);
-    const billingCycles = Array.isArray(card.billing_cycles)
-        ? card.billing_cycles
-        : [];
-
-    return billingCycles.some((cycle) => String(cycle.closing_date) >= purchaseDateValue);
-};
-
 const firstInstallmentPaymentDate = computed(() => {
     if (!isCreditPayment.value || selectedCard.value === null) {
         return null;
@@ -201,66 +138,6 @@ const firstInstallmentPaymentDateIsEstimated = computed(() => {
 
     return !hasRealCycleForPurchaseDate(form.value.purchase_date, selectedCard.value);
 });
-
-const isInSelectedPeriod = (dateValue) => {
-    if (!dateValue) {
-        return false;
-    }
-
-    return String(dateValue).slice(0, 7) === selectedPeriod.value;
-};
-
-const parseAmount = (value) => Number.parseFloat(value ?? 0) || 0;
-
-const incomeTransactions = computed(() => transactions.value
-    .filter((transaction) => transaction.type === 'income')
-    .filter((transaction) => isInSelectedPeriod(transaction.purchase_date)));
-
-const expenseTransactions = computed(() => transactions.value
-    .filter((transaction) => transaction.type === 'expense')
-    .flatMap((transaction) => {
-        const installments = transaction.installment_plan?.installments ?? [];
-
-        if (installments.length > 0) {
-            const totalInstallments = installments.length;
-
-            return installments
-                .filter((installment) => isInSelectedPeriod(installment.due_date))
-                .map((installment) => ({
-                    id: `${transaction.id}-installment-${installment.id ?? installment.installment_number}`,
-                    category: transaction.category,
-                    description: transaction.description,
-                    purchase_date: installment.due_date,
-                    payment_method: transaction.payment_method,
-                    amount: installment.amount,
-                    installment_number: installment.installment_number,
-                    tags: transaction.tags,
-                    total_installments: totalInstallments,
-                    type: 'expense',
-                }));
-        }
-
-        const expenseDate = transaction.payment_date ?? transaction.purchase_date;
-
-        if (!isInSelectedPeriod(expenseDate)) {
-            return [];
-        }
-
-        return [{
-            ...transaction,
-            purchase_date: expenseDate,
-        }];
-    }));
-
-const dashboardRecentTransactions = computed(() => [...incomeTransactions.value, ...expenseTransactions.value]
-    .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
-    .slice(0, 10));
-
-const incomeTotal = computed(() => incomeTransactions.value
-    .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0));
-
-const expenseTotal = computed(() => expenseTransactions.value
-    .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0));
 
 const cardsSummary = computed(() => [
     { title: 'Ingresos', value: `${currencySymbol}${formatAmount(incomeTotal.value)}` },
@@ -403,37 +280,6 @@ const runWithLoading = async (handler, fallbackMessage) => {
         errorMessage.value = error?.response?.data?.message ?? fallbackMessage;
     } finally {
         loading.value = false;
-    }
-};
-
-const loadTransactions = async () => {
-    const period = selectedPeriod.value;
-
-    if (loadedTransactionsPeriod.value === period) {
-        transactionsLoading.value = false;
-
-        return;
-    }
-
-    transactionsLoading.value = true;
-
-    try {
-        const response = await window.axios.get('/transactions', {
-            params: {
-                period,
-            },
-        });
-
-        if (selectedPeriod.value !== period) {
-            return;
-        }
-
-        transactions.value = response.data;
-        loadedTransactionsPeriod.value = period;
-    } finally {
-        if (selectedPeriod.value === period) {
-            transactionsLoading.value = false;
-        }
     }
 };
 
@@ -649,7 +495,7 @@ const submitTransaction = async () => {
         const registeredType = form.value.type;
 
         successMessage.value = 'Transacción guardada correctamente.';
-        loadedTransactionsPeriod.value = null;
+        invalidateTransactions();
         resetTransactionForm();
         forcedTransactionType.value = null;
         activeScreen.value = registeredType === 'income' ? 'income-list' : 'expense-list';

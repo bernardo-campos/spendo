@@ -22,7 +22,7 @@ test('installments start with estimated due dates and are updated to real due da
     ]);
 
     $this->actingAs($user)
-        ->postJson('/api/transactions', [
+        ->postJson('/transactions', [
             'type' => 'expense',
             'description' => 'Compra en cuotas',
             'amount' => 120000,
@@ -43,21 +43,21 @@ test('installments start with estimated due dates and are updated to real due da
     ]);
 
     $this->actingAs($user)
-        ->postJson("/api/cards/{$card->id}/billing-cycles", [
+        ->postJson("/cards/{$card->id}/billing-cycles", [
             'closing_date' => '2026-03-10',
             'due_date' => '2026-04-17',
         ])
         ->assertCreated();
 
     $this->actingAs($user)
-        ->postJson("/api/cards/{$card->id}/billing-cycles", [
+        ->postJson("/cards/{$card->id}/billing-cycles", [
             'closing_date' => '2026-04-10',
             'due_date' => '2026-05-16',
         ])
         ->assertCreated();
 
     $this->actingAs($user)
-        ->postJson("/api/cards/{$card->id}/billing-cycles", [
+        ->postJson("/cards/{$card->id}/billing-cycles", [
             'closing_date' => '2026-05-10',
             'due_date' => '2026-06-17',
         ])

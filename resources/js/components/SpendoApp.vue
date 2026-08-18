@@ -361,22 +361,22 @@ const runWithLoading = async (handler, fallbackMessage) => {
 };
 
 const loadTransactions = async () => {
-    const response = await window.axios.get('/api/transactions');
+    const response = await window.axios.get('/transactions');
     transactions.value = response.data;
 };
 
 const loadCategories = async () => {
-    const response = await window.axios.get('/api/categories');
+    const response = await window.axios.get('/categories');
     categories.value = response.data;
 };
 
 const loadTags = async () => {
-    const response = await window.axios.get('/api/tags');
+    const response = await window.axios.get('/tags');
     tags.value = response.data;
 };
 
 const loadCards = async () => {
-    const response = await window.axios.get('/api/cards');
+    const response = await window.axios.get('/cards');
     cards.value = response.data;
 };
 
@@ -526,10 +526,10 @@ const submitBillingCycle = async (cardId) => {
         };
 
         if (cycleForm.id === null) {
-            await window.axios.post(`/api/cards/${cardId}/billing-cycles`, payload);
+            await window.axios.post(`/cards/${cardId}/billing-cycles`, payload);
             successMessage.value = 'Ciclo de facturación creado correctamente.';
         } else {
-            await window.axios.put(`/api/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
+            await window.axios.put(`/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
             successMessage.value = 'Ciclo de facturación actualizado correctamente.';
         }
 
@@ -565,7 +565,7 @@ const submitTransaction = async () => {
                 : {}),
         };
 
-        await window.axios.post('/api/transactions', payload);
+        await window.axios.post('/transactions', payload);
 
         const registeredType = form.value.type;
 
@@ -599,10 +599,10 @@ const submitCategory = async () => {
         };
 
         if (categoryForm.value.id === null) {
-            await window.axios.post('/api/categories', payload);
+            await window.axios.post('/categories', payload);
             successMessage.value = 'Categoría creada correctamente.';
         } else {
-            await window.axios.put(`/api/categories/${categoryForm.value.id}`, payload);
+            await window.axios.put(`/categories/${categoryForm.value.id}`, payload);
             successMessage.value = 'Categoría actualizada correctamente.';
         }
 
@@ -620,7 +620,7 @@ const removeCategory = async (categoryId) => {
     successMessage.value = '';
 
     try {
-        await window.axios.delete(`/api/categories/${categoryId}`);
+        await window.axios.delete(`/categories/${categoryId}`);
         successMessage.value = 'Categoría eliminada correctamente.';
 
         if (Number(form.value.category_id) === categoryId) {
@@ -650,10 +650,10 @@ const submitTag = async () => {
         };
 
         if (tagForm.value.id === null) {
-            await window.axios.post('/api/tags', payload);
+            await window.axios.post('/tags', payload);
             successMessage.value = 'Tag creado correctamente.';
         } else {
-            await window.axios.put(`/api/tags/${tagForm.value.id}`, payload);
+            await window.axios.put(`/tags/${tagForm.value.id}`, payload);
             successMessage.value = 'Tag actualizado correctamente.';
         }
 
@@ -671,7 +671,7 @@ const removeTag = async (tagId) => {
     successMessage.value = '';
 
     try {
-        await window.axios.delete(`/api/tags/${tagId}`);
+        await window.axios.delete(`/tags/${tagId}`);
         successMessage.value = 'Tag eliminado correctamente.';
         form.value.tag_ids = form.value.tag_ids.filter((value) => Number(value) !== tagId);
         await runWithLoading(loadTags, 'No fue posible cargar los tags.');
@@ -704,10 +704,10 @@ const submitCard = async () => {
         };
 
         if (cardForm.value.id === null) {
-            await window.axios.post('/api/cards', payload);
+            await window.axios.post('/cards', payload);
             successMessage.value = 'Tarjeta creada correctamente.';
         } else {
-            await window.axios.put(`/api/cards/${cardForm.value.id}`, payload);
+            await window.axios.put(`/cards/${cardForm.value.id}`, payload);
             successMessage.value = 'Tarjeta actualizada correctamente.';
         }
 
@@ -725,7 +725,7 @@ const removeCard = async (cardId) => {
     successMessage.value = '';
 
     try {
-        await window.axios.delete(`/api/cards/${cardId}`);
+        await window.axios.delete(`/cards/${cardId}`);
         successMessage.value = 'Tarjeta eliminada correctamente.';
 
         if (Number(form.value.card_id) === cardId) {

@@ -33,7 +33,7 @@ test('card with associated transactions cannot be deleted', function () {
     ]);
 
     $this->actingAs($user)
-        ->deleteJson("/api/cards/{$card->id}")
+        ->deleteJson("/cards/{$card->id}")
         ->assertStatus(422)
         ->assertJson([
             'message' => 'No se puede eliminar una tarjeta asociada a transacciones.',
@@ -55,7 +55,7 @@ test('card without associated transactions can be deleted', function () {
     ]);
 
     $this->actingAs($user)
-        ->deleteJson("/api/cards/{$card->id}")
+        ->deleteJson("/cards/{$card->id}")
         ->assertNoContent();
 
     $this->assertDatabaseMissing('cards', ['id' => $card->id]);

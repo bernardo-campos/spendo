@@ -24,9 +24,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::view('/app', 'app')->name('app');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-});
 
-Route::middleware('auth')->prefix('api')->group(function () {
     Route::get('/dashboard', DashboardController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('tags', TagController::class);

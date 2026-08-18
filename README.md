@@ -63,6 +63,50 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
 - Pest `4`
 - MariaDB
 
+## Base visual del panel administrativo
+
+La interfaz administrativa toma como referencia el proyecto
+[`Whbbit1999/shadcn-vue-admin`](https://github.com/Whbbit1999/shadcn-vue-admin).
+No se incorpora como un repositorio anidado, submódulo ni dependencia de npm:
+es un template de código fuente, no una librería instalable.
+
+### Cómo se integró
+
+1. Se revisó el template en forma temporal, fuera de este repositorio.
+2. Se adaptaron sus conceptos visuales al stack actual de Laravel, Vue y Vite:
+   sidebar responsive, cabecera, menú de usuario y tema claro/oscuro.
+3. Se conservaron las pantallas y la lógica existentes de Spendo.
+4. Se agregó `@lucide/vue` para los iconos que utiliza la interfaz.
+
+Por lo tanto, los estilos y componentes adaptados son código propio de Spendo,
+principalmente en `resources/js/components/SpendoApp.vue` y
+`resources/css/app.css`. Las actualizaciones del template no se aplican de
+forma automática: se revisan y adoptan de manera selectiva cuando aporten valor
+al proyecto.
+
+### Evolución recomendada
+
+Para crear nuevas pantallas con el mismo diseño sin duplicar la navegación ni
+los estilos, conviene extraer gradualmente una base reutilizable:
+
+```text
+resources/js/
+  components/admin/
+    AdminLayout.vue
+    AdminSidebar.vue
+    AdminHeader.vue
+    ui/
+  pages/
+    DashboardPage.vue
+    TransactionsPage.vue
+    CardsPage.vue
+```
+
+El template original incluye una skill de Codex, pero está diseñada para su
+estructura propia (TypeScript, Vue Router, Pinia y `src/`). Si se añade una
+skill al proyecto, debe adaptarse a Laravel, Vite y `resources/js`; Laravel
+Boost complementa esa guía, pero no instala ni sustituye skills.
+
 ## Estructura funcional (alto nivel)
 - Backend API y auth: `routes/web.php`
 - Front principal SPA-like: `resources/js/components/SpendoApp.vue`

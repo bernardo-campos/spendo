@@ -1,5 +1,17 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+    BarChart3,
+    CreditCard,
+    FolderTree,
+    Menu,
+    Moon,
+    ReceiptText,
+    Sun,
+    Tags,
+    WalletCards,
+    X,
+} from '@lucide/vue';
 
 const rootElement = document.getElementById('spendo-app');
 const userName = rootElement?.dataset.userName ?? 'Usuario';
@@ -12,6 +24,8 @@ const forcedTransactionType = ref(null);
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
 const userMenuRef = ref(null);
 const userMenuOpen = ref(false);
+const sidebarOpen = ref(false);
+const isDarkMode = ref(false);
 const savingTransaction = ref(false);
 const savingCategory = ref(false);
 const savingTag = ref(false);
@@ -29,6 +43,14 @@ const categories = ref([]);
 const tags = ref([]);
 const cards = ref([]);
 const transactions = ref([]);
+
+const userInitials = computed(() => userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((name) => name[0])
+    .join('')
+    .toUpperCase());
 
 const form = ref({
     type: 'expense',
@@ -326,7 +348,18 @@ const closeUserMenu = () => {
 
 const setActiveScreenFromMenu = (screen) => {
     activeScreen.value = screen;
+    sidebarOpen.value = false;
     closeUserMenu();
+};
+
+const applyColorMode = (isDark) => {
+    isDarkMode.value = isDark;
+    document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('spendo-color-mode', isDark ? 'dark' : 'light');
+};
+
+const toggleColorMode = () => {
+    applyColorMode(!isDarkMode.value);
 };
 
 const onDocumentPointerDown = (event) => {
@@ -340,6 +373,10 @@ const onDocumentPointerDown = (event) => {
 };
 
 onMounted(() => {
+    const storedColorMode = localStorage.getItem('spendo-color-mode');
+    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    applyColorMode(storedColorMode ? storedColorMode === 'dark' : prefersDarkMode);
     document.addEventListener('pointerdown', onDocumentPointerDown);
 });
 
@@ -740,33 +777,81 @@ const removeCard = async (cardId) => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        <main class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
-            <header class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
-                <nav class="flex flex-wrap items-center gap-2">
-                    <button type="button" class="rounded-md px-3 py-2 text-sm font-medium" :class="activePrimaryTab === 'dashboard' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'" @click="activeScreen = 'dashboard'">Dashboard</button>
-                    <button type="button" class="rounded-md px-3 py-2 text-sm font-medium" :class="activePrimaryTab === 'income-list' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'" @click="activeScreen = 'income-list'">Ingresos</button>
-                    <button type="button" class="rounded-md px-3 py-2 text-sm font-medium" :class="activePrimaryTab === 'expense-list' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'" @click="activeScreen = 'expense-list'">Egresos</button>
-                </nav>
+    <div class="min-h-screen bg-background text-foreground">
+        <div v-if="sidebarOpen" class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" @click="sidebarOpen = false"></div>
 
+        <aside class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+            <div class="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
+                <span class="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">S</span>
+                <span class="font-semibold tracking-tight">Spendo</span>
+                <button type="button" class="ml-auto rounded-md p-1.5 hover:bg-sidebar-accent lg:hidden" aria-label="Cerrar menú" @click="sidebarOpen = false">
+                    <X class="size-5" />
+                </button>
+            </div>
+
+            <nav class="flex-1 space-y-1 p-3">
+                <p class="px-3 pb-2 pt-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Finanzas</p>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'dashboard' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('dashboard')">
+                    <BarChart3 class="size-4" />
+                    Resumen
+                </button>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'income-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('income-list')">
+                    <WalletCards class="size-4" />
+                    Ingresos
+                </button>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'expense-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('expense-list')">
+                    <ReceiptText class="size-4" />
+                    Egresos
+                </button>
+
+                <p class="px-3 pb-2 pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuración</p>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'cards' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('cards')">
+                    <CreditCard class="size-4" />
+                    Tarjetas
+                </button>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'categories' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('categories')">
+                    <FolderTree class="size-4" />
+                    Categorías
+                </button>
+                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'tags' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('tags')">
+                    <Tags class="size-4" />
+                    Etiquetas
+                </button>
+            </nav>
+
+            <div class="border-t border-sidebar-border p-3 text-xs text-muted-foreground">Tu información financiera, en un solo lugar.</div>
+        </aside>
+
+        <div class="min-h-screen lg:pl-64">
+            <header class="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur lg:px-6">
+                <button type="button" class="rounded-md p-2 hover:bg-accent lg:hidden" aria-label="Abrir menú" @click="sidebarOpen = true">
+                    <Menu class="size-5" />
+                </button>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold">Spendo</p>
+                    <p class="hidden text-xs text-muted-foreground sm:block">Administrá tus finanzas personales</p>
+                </div>
+                <button type="button" class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="toggleColorMode">
+                    <Sun v-if="isDarkMode" class="size-5" />
+                    <Moon v-else class="size-5" />
+                </button>
                 <div ref="userMenuRef" class="relative">
-                    <button type="button" class="cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800" @click="toggleUserMenu">
-                        {{ userName }}
+                    <button type="button" class="flex items-center gap-2 rounded-md p-1.5 hover:bg-accent" @click="toggleUserMenu">
+                        <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{{ userInitials }}</span>
+                        <span class="hidden max-w-36 truncate text-sm font-medium sm:block">{{ userName }}</span>
                     </button>
-                    <div v-if="userMenuOpen" class="absolute right-0 z-20 mt-2 w-56 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" @click="setActiveScreenFromMenu('cards')">Tarjetas</button>
-                        <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" @click="setActiveScreenFromMenu('categories')">Categorías</button>
-                        <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" @click="setActiveScreenFromMenu('tags')">Tags</button>
-                        <div class="my-1 border-t border-slate-200 dark:border-slate-700"></div>
+                    <div v-if="userMenuOpen" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
+                        <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
+                        <div class="my-1 border-t border-border"></div>
                         <form method="POST" action="/logout" class="w-full">
                             <input type="hidden" name="_token" :value="csrfToken">
-                            <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">
-                                Cerrar sesión
-                            </button>
+                            <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>
                         </form>
                     </div>
                 </div>
             </header>
+
+            <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
 
             <section v-if="activeScreen === 'income-list'" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div class="mb-4 flex items-center justify-between gap-3">
@@ -1060,5 +1145,6 @@ const removeCard = async (cardId) => {
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>
         </main>
+        </div>
     </div>
 </template>

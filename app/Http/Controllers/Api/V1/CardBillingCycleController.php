@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCardBillingCycleRequest;
 use App\Http\Requests\UpdateCardBillingCycleRequest;
+use App\Http\Resources\Api\V1\CardBillingCycleResource;
 use App\Models\Card;
 use App\Models\CardBillingCycle;
 use App\Services\InstallmentDueDateSyncService;
@@ -18,9 +20,13 @@ class CardBillingCycleController extends Controller
     {
         abort_unless($card->user_id === $request->user()?->id, 404);
 
-        return response()->json(
-            $card->billingCycles()->orderBy('closing_date')->get()
-        );
+        $cycles = $card->billingCycles()->orderBy('closing_date');
+
+        if ($request->routeIs('api.v1.*')) {
+            return CardBillingCycleResource::collection($cycles->paginate())->response();
+        }
+
+        return response()->json($cycles->get());
     }
 
     public function store(StoreCardBillingCycleRequest $request, Card $card): JsonResponse
@@ -31,13 +37,23 @@ class CardBillingCycleController extends Controller
 
         $this->installmentDueDateSyncService->syncCard($card->fresh());
 
-        return response()->json($cycle->fresh(), 201);
+        $cycle = $cycle->fresh();
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardBillingCycleResource($cycle))->response()->setStatusCode(201);
+        }
+
+        return response()->json($cycle, 201);
     }
 
     public function show(Request $request, Card $card, CardBillingCycle $billingCycle): JsonResponse
     {
         abort_unless($card->user_id === $request->user()?->id, 404);
         abort_unless($billingCycle->card_id === $card->id, 404);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardBillingCycleResource($billingCycle))->response();
+        }
 
         return response()->json($billingCycle);
     }
@@ -71,7 +87,13 @@ class CardBillingCycleController extends Controller
 
         $this->installmentDueDateSyncService->syncCard($card->fresh());
 
-        return response()->json($billingCycle->fresh());
+        $billingCycle = $billingCycle->fresh();
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardBillingCycleResource($billingCycle))->response();
+        }
+
+        return response()->json($billingCycle);
     }
 
     public function destroy(Request $request, Card $card, CardBillingCycle $billingCycle): JsonResponse

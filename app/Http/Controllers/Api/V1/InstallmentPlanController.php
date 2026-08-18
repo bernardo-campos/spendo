@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreInstallmentPlanRequest;
+use App\Http\Resources\Api\V1\InstallmentPlanResource;
 use App\Models\Installment;
 use App\Models\InstallmentPlan;
 use App\Services\InstallmentPlanService;
@@ -23,10 +25,13 @@ class InstallmentPlanController extends Controller
         $plans = InstallmentPlan::query()
             ->where('user_id', $user->id)
             ->with(['transaction', 'card', 'installments'])
-            ->latest()
-            ->get();
+            ->latest();
 
-        return response()->json($plans);
+        if ($request->routeIs('api.v1.*')) {
+            return InstallmentPlanResource::collection($plans->paginate())->response();
+        }
+
+        return response()->json($plans->get());
     }
 
     public function store(StoreInstallmentPlanRequest $request): JsonResponse
@@ -56,14 +61,26 @@ class InstallmentPlanController extends Controller
             return $plan;
         });
 
-        return response()->json($plan->load(['transaction', 'card', 'installments']), 201);
+        $plan->load(['transaction', 'card', 'installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new InstallmentPlanResource($plan))->response()->setStatusCode(201);
+        }
+
+        return response()->json($plan, 201);
     }
 
     public function show(Request $request, InstallmentPlan $installmentPlan): JsonResponse
     {
         abort_unless($installmentPlan->user_id === $request->user()?->id, 404);
 
-        return response()->json($installmentPlan->load(['transaction', 'card', 'installments']));
+        $installmentPlan->load(['transaction', 'card', 'installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new InstallmentPlanResource($installmentPlan))->response();
+        }
+
+        return response()->json($installmentPlan);
     }
 
     public function update(Request $request, InstallmentPlan $installmentPlan): JsonResponse
@@ -87,7 +104,13 @@ class InstallmentPlanController extends Controller
 
         $this->installmentPlanService->syncStatus($installmentPlan->fresh('installments'));
 
-        return response()->json($installmentPlan->fresh()->load(['transaction', 'card', 'installments']));
+        $installmentPlan = $installmentPlan->fresh()->load(['transaction', 'card', 'installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new InstallmentPlanResource($installmentPlan))->response();
+        }
+
+        return response()->json($installmentPlan);
     }
 
     public function destroy(Request $request, InstallmentPlan $installmentPlan): JsonResponse

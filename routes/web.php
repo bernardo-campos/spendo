@@ -1,13 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\V1\CardBillingCycleController;
+use App\Http\Controllers\Api\V1\CardController;
+use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\InstallmentPlanController;
+use App\Http\Controllers\Api\V1\TagController;
+use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CardBillingCycleController;
-use App\Http\Controllers\CardController;
-use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\InstallmentPlanController;
-use App\Http\Controllers\TagController;
-use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {

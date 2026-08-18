@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCardRequest;
 use App\Http\Requests\UpdateCardRequest;
+use App\Http\Resources\Api\V1\CardResource;
 use App\Models\Card;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,10 +21,13 @@ class CardController extends Controller
         $cards = Card::query()
             ->where('user_id', $user->id)
             ->with(['billingCycles' => fn ($query) => $query->orderBy('closing_date')])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return response()->json($cards);
+        if ($request->routeIs('api.v1.*')) {
+            return CardResource::collection($cards->paginate())->response();
+        }
+
+        return response()->json($cards->get());
     }
 
     public function store(StoreCardRequest $request): JsonResponse
@@ -32,6 +37,10 @@ class CardController extends Controller
             'user_id' => $request->user()->id,
         ]);
 
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardResource($card))->response()->setStatusCode(201);
+        }
+
         return response()->json($card, 201);
     }
 
@@ -39,7 +48,13 @@ class CardController extends Controller
     {
         abort_unless($card->user_id === $request->user()?->id, 404);
 
-        return response()->json($card->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]));
+        $card->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardResource($card))->response();
+        }
+
+        return response()->json($card);
     }
 
     public function update(UpdateCardRequest $request, Card $card): JsonResponse
@@ -48,7 +63,13 @@ class CardController extends Controller
 
         $card->update($request->validated());
 
-        return response()->json($card->fresh()->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]));
+        $card = $card->fresh()->load(['billingCycles' => fn ($query) => $query->orderBy('closing_date')]);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new CardResource($card))->response();
+        }
+
+        return response()->json($card);
     }
 
     public function destroy(Request $request, Card $card): JsonResponse

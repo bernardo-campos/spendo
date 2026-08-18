@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\PaymentMethodType;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTransactionRequest;
 use App\Http\Requests\UpdateTransactionRequest;
+use App\Http\Resources\Api\V1\TransactionResource;
 use App\Models\Card;
 use App\Models\InstallmentPlan;
 use App\Models\Transaction;
@@ -32,10 +34,13 @@ class TransactionController extends Controller
         $transactions = Transaction::query()
             ->where('user_id', $user->id)
             ->with(['category', 'card', 'tags', 'installmentPlan.installments'])
-            ->latest('purchase_date')
-            ->get();
+            ->latest('purchase_date');
 
-        return response()->json($transactions);
+        if ($request->routeIs('api.v1.*')) {
+            return TransactionResource::collection($transactions->paginate())->response();
+        }
+
+        return response()->json($transactions->get());
     }
 
     public function store(StoreTransactionRequest $request): JsonResponse
@@ -123,17 +128,26 @@ class TransactionController extends Controller
             return $transaction;
         });
 
-        return response()->json(
-            $transaction->load(['category', 'card', 'tags', 'installmentPlan.installments']),
-            201
-        );
+        $transaction->load(['category', 'card', 'tags', 'installmentPlan.installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new TransactionResource($transaction))->response()->setStatusCode(201);
+        }
+
+        return response()->json($transaction, 201);
     }
 
     public function show(Request $request, Transaction $transaction): JsonResponse
     {
         abort_unless($transaction->user_id === $request->user()?->id, 404);
 
-        return response()->json($transaction->load(['category', 'card', 'tags', 'installmentPlan.installments']));
+        $transaction->load(['category', 'card', 'tags', 'installmentPlan.installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new TransactionResource($transaction))->response();
+        }
+
+        return response()->json($transaction);
     }
 
     public function update(UpdateTransactionRequest $request, Transaction $transaction): JsonResponse
@@ -182,7 +196,13 @@ class TransactionController extends Controller
             $transaction->tags()->sync($request->validated('tag_ids', []));
         }
 
-        return response()->json($transaction->fresh()->load(['category', 'card', 'tags', 'installmentPlan.installments']));
+        $transaction = $transaction->fresh()->load(['category', 'card', 'tags', 'installmentPlan.installments']);
+
+        if ($request->routeIs('api.v1.*')) {
+            return (new TransactionResource($transaction))->response();
+        }
+
+        return response()->json($transaction);
     }
 
     public function destroy(Request $request, Transaction $transaction): JsonResponse

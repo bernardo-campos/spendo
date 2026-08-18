@@ -1,7 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AdminLayout from './admin/AdminLayout.vue';
+import CardsPage from '../pages/CardsPage.vue';
+import CategoriesPage from '../pages/CategoriesPage.vue';
 import DashboardPage from '../pages/DashboardPage.vue';
+import TagsPage from '../pages/TagsPage.vue';
+import TransactionFormPage from '../pages/TransactionFormPage.vue';
 import TransactionListPage from '../pages/TransactionListPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
@@ -837,216 +841,13 @@ const removeCard = async (cardId) => {
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" />
 
-            <section v-if="activeScreen === 'transaction-form'" class="grid gap-6">
-                <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="mb-4 text-base font-semibold">{{ transactionFormTitle }}</h2>
-                    <form class="space-y-3" @submit.prevent="submitTransaction">
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <label v-if="!forcedTransactionType" class="space-y-1 text-sm">
-                                <span class="font-medium">Tipo</span>
-                                <select v-model="form.type" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                    <option value="expense">Gasto</option>
-                                    <option value="income">Ingreso</option>
-                                </select>
-                            </label>
-                            <label class="space-y-1 text-sm">
-                                <span class="font-medium">Monto</span>
-                                <input v-model="form.amount" type="number" min="0" step="0.01" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                            </label>
-                        </div>
+        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-date="formatDate" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @submit="submitTransaction" />
 
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Descripción</span>
-                            <input v-model="form.description" type="text" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
+        <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Categoría</span>
-                            <select v-model="form.category_id" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                <option value="">Sin categoría</option>
-                                <option v-for="category in categoryOptions" :key="category.id" :value="category.id">{{ category.name }}</option>
-                            </select>
-                        </label>
+        <CategoriesPage v-if="activeScreen === 'categories'" :categories="categories" :form="categoryForm" :saving="savingCategory" :scope-label="categoryScopeLabel" @edit="editCategory" @remove="removeCategory" @reset="resetCategoryForm" @submit="submitCategory" />
 
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Tags</span>
-                            <select v-model="form.tag_ids" multiple class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                <option v-for="tag in tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
-                            </select>
-                            <span class="text-xs text-slate-500 dark:text-slate-400">Mantén Ctrl/Cmd para seleccionar varios.</span>
-                        </label>
-
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Fecha</span>
-                            <input v-model="form.purchase_date" type="date" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-
-                        <label v-if="form.type === 'expense'" class="space-y-1 text-sm">
-                            <span class="font-medium">Forma de pago</span>
-                            <select v-model="form.payment_method" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                <option v-for="paymentMethod in PAYMENT_METHODS" :key="paymentMethod.value" :value="paymentMethod.value">{{ paymentMethod.label }}</option>
-                            </select>
-                        </label>
-
-                        <label v-if="isCreditPayment" class="space-y-1 text-sm">
-                            <span class="font-medium">Tarjeta</span>
-                            <select v-model="form.card_id" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                <option value="" disabled>Selecciona una tarjeta</option>
-                                <option v-for="card in cards" :key="card.id" :value="card.id">{{ card.name }} · ****{{ card.last_four_digits }}</option>
-                            </select>
-                        </label>
-
-                        <p v-if="firstInstallmentPaymentDate" class="text-xs text-slate-500 dark:text-slate-400">
-                            La primera cuota se pagará el {{ formatDate(firstInstallmentPaymentDate) }}
-                            {{ firstInstallmentPaymentDateIsEstimated ? '(fecha estimada)' : '(fecha real por ciclo cargado)' }}.
-                        </p>
-
-                        <label v-if="isCreditPayment" class="space-y-1 text-sm">
-                            <span class="font-medium">Cuotas</span>
-                            <input v-model.number="form.installments_count" type="number" min="1" max="120" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-
-                        <p v-if="showInstallments" class="text-xs text-slate-500 dark:text-slate-400">
-                            La fecha de pago se calcula automáticamente según cierre/vencimiento de la tarjeta.
-                        </p>
-
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Notas</span>
-                            <textarea v-model="form.notes" rows="3" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"></textarea>
-                        </label>
-
-                        <button type="submit" :disabled="savingTransaction" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
-                            {{ savingTransaction ? 'Guardando...' : 'Guardar transacción' }}
-                        </button>
-                    </form>
-                </article>
-            </section>
-
-            <section v-if="activeScreen === 'cards'" class="grid gap-6">
-                <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="mb-4 text-base font-semibold">Tarjetas</h2>
-                    <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">Las formas de pago son fijas en el sistema: Efectivo y Crédito.</p>
-
-                    <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="submitCard">
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Nombre</span>
-                            <input v-model="cardForm.name" type="text" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Últimos 4 dígitos</span>
-                            <input v-model="cardForm.last_four_digits" type="text" maxlength="4" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Día de cierre</span>
-                            <input v-model="cardForm.closing_day" type="number" min="1" max="31" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-                        <label class="space-y-1 text-sm">
-                            <span class="font-medium">Día de vencimiento</span>
-                            <input v-model="cardForm.due_day" type="number" min="1" max="31" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                        </label>
-
-                        <div class="sm:col-span-2 flex gap-2">
-                            <button type="submit" :disabled="savingCard" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ cardForm.id === null ? 'Crear' : 'Actualizar' }}</button>
-                            <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700" @click="resetCardForm">Limpiar</button>
-                        </div>
-                    </form>
-
-                    <ul class="mt-4 space-y-2">
-                        <li v-for="card in cards" :key="card.id" class="rounded-md border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="font-medium">{{ card.name }}</p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">****{{ card.last_four_digits }} · Cierre estimado {{ card.closing_day }} · Vence estimado {{ card.due_day }}</p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editCard(card)">Editar</button>
-                                    <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="removeCard(card.id)">Eliminar</button>
-                                </div>
-                            </div>
-
-                            <div class="mt-3 rounded-md border border-slate-200 p-3 dark:border-slate-800">
-                                <p class="mb-2 text-xs font-medium text-slate-600 dark:text-slate-300">Ciclos de facturación (reales)</p>
-
-                                <p v-if="!Array.isArray(card.billing_cycles) || card.billing_cycles.length === 0" class="mb-2 text-xs text-slate-500 dark:text-slate-400">
-                                    No hay ciclos cargados para esta tarjeta.
-                                </p>
-
-                                <ul v-else class="mb-3 space-y-1">
-                                    <li v-for="cycle in card.billing_cycles" :key="cycle.id" class="flex items-center justify-between rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700">
-                                        <span>Cierre {{ formatDate(cycle.closing_date) }} · Vence {{ formatDate(cycle.due_date) }}</span>
-                                        <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editBillingCycle(card.id, cycle)">Editar ciclo</button>
-                                    </li>
-                                </ul>
-
-                                <form class="grid gap-2 sm:grid-cols-3" @submit.prevent="submitBillingCycle(card.id)">
-                                    <input v-model="getBillingCycleForm(card.id).closing_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
-                                    <input v-model="getBillingCycleForm(card.id).due_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
-                                    <div class="flex gap-2">
-                                        <button type="submit" :disabled="savingBillingCycle" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
-                                            {{ getBillingCycleForm(card.id).id === null ? 'Agregar ciclo' : 'Actualizar ciclo' }}
-                                        </button>
-                                        <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-xs dark:border-slate-700" @click="resetBillingCycleForm(card.id)">Limpiar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </li>
-                    </ul>
-                </article>
-            </section>
-
-            <section v-if="activeScreen === 'categories'" class="grid gap-6">
-                <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="mb-4 text-base font-semibold">Categorías</h2>
-                    <form class="grid gap-3 sm:grid-cols-3" @submit.prevent="submitCategory">
-                        <input v-model="categoryForm.name" type="text" required placeholder="Nombre" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-                        <select v-model="categoryForm.scope" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-                            <option value="income">Ingreso</option>
-                            <option value="expense">Gasto</option>
-                            <option value="both">Ambos</option>
-                        </select>
-                        <div class="flex gap-2">
-                            <button type="submit" :disabled="savingCategory" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ categoryForm.id === null ? 'Crear' : 'Actualizar' }}</button>
-                            <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700" @click="resetCategoryForm">Limpiar</button>
-                        </div>
-                    </form>
-                    <ul class="mt-4 space-y-2">
-                        <li v-for="category in categories" :key="category.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                            <div>
-                                <p class="font-medium">{{ category.name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ categoryScopeLabel(category.scope) }}</p>
-                            </div>
-                            <div class="flex gap-2">
-                                <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editCategory(category)">Editar</button>
-                                <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="removeCategory(category.id)">Eliminar</button>
-                            </div>
-                        </li>
-                    </ul>
-                </article>
-            </section>
-
-            <section v-if="activeScreen === 'tags'" class="grid gap-6">
-                <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="mb-4 text-base font-semibold">Tags</h2>
-                    <form class="grid gap-3 sm:grid-cols-3" @submit.prevent="submitTag">
-                        <input v-model="tagForm.name" type="text" required placeholder="Nombre" class="sm:col-span-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-                        <div class="flex gap-2">
-                            <button type="submit" :disabled="savingTag" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ tagForm.id === null ? 'Crear' : 'Actualizar' }}</button>
-                            <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700" @click="resetTagForm">Limpiar</button>
-                        </div>
-                    </form>
-                    <ul class="mt-4 space-y-2">
-                        <li v-for="tag in tags" :key="tag.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                            <p class="font-medium">{{ tag.name }}</p>
-                            <div class="flex gap-2">
-                                <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editTag(tag)">Editar</button>
-                                <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="removeTag(tag.id)">Eliminar</button>
-                            </div>
-                        </li>
-                    </ul>
-                </article>
-            </section>
+        <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

@@ -26,13 +26,12 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
 
 ### Flujo UX actual
 - Sidebar responsive para `Resumen`, `Ingresos`, `Egresos`, `Tarjetas`, `Categorías` y `Etiquetas`.
-- Cabecera con menú de usuario, cierre de sesión y selector de tema claro/oscuro.
+- Cabecera con selector de período global, menú de usuario, cierre de sesión y
+  selector de tema claro/oscuro.
 - Pantallas separadas para ingresos y egresos.
 - Botones `Registrar ingreso` y `Registrar egreso` fijos abajo.
-- Selector de período mensual (`YYYY-MM`) en:
-  - dashboard,
-  - listado de ingresos,
-  - listado de egresos.
+- Selector de período mensual (`YYYY-MM`) global en la cabecera, aplicado al
+  dashboard y a los listados de ingresos y egresos.
 
 ### Reglas de negocio implementadas
 - Formas de pago para egresos: `cash` y `credit`.

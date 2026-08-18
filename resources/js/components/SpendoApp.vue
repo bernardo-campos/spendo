@@ -768,7 +768,7 @@ const removeCard = async (cardId) => {
 </script>
 
 <template>
-    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :is-dark-mode="isDarkMode" :sidebar-open="sidebarOpen" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu">
+    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
         <template #user-menu="{ open }">
             <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
                 <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
@@ -780,11 +780,11 @@ const removeCard = async (cardId) => {
             </div>
         </template>
 
-        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :selected-period="selectedPeriod" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" @update:selected-period="selectedPeriod = $event" />
+        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :selected-period="selectedPeriod" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" @update:selected-period="selectedPeriod = $event" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" />
 
-        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" :selected-period="selectedPeriod" @update:selected-period="selectedPeriod = $event" />
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" />
 
             <section v-if="activeScreen === 'transaction-form'" class="grid gap-6">
                 <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">

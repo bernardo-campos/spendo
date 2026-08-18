@@ -1,9 +1,13 @@
 <script setup>
-import { Menu, Moon, Sun } from '@lucide/vue';
+import { CalendarDays, Menu, Moon, Sun } from '@lucide/vue';
 
 defineProps({
     isDarkMode: {
         type: Boolean,
+        required: true,
+    },
+    selectedPeriod: {
+        type: String,
         required: true,
     },
     userInitials: {
@@ -20,7 +24,7 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu']);
+const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
 </script>
 
 <template>
@@ -28,10 +32,11 @@ const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu
         <button type="button" class="rounded-md p-2 hover:bg-accent lg:hidden" aria-label="Abrir menú" @click="emit('open-sidebar')">
             <Menu class="size-5" />
         </button>
-        <div class="min-w-0 flex-1">
-            <p class="text-sm font-semibold">Spendo</p>
-            <p class="hidden text-xs text-muted-foreground sm:block">Administrá tus finanzas personales</p>
-        </div>
+        <label class="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium sm:max-w-64">
+            <CalendarDays class="size-4 shrink-0 text-muted-foreground" />
+            <span class="sr-only">Período</span>
+            <input :value="selectedPeriod" type="month" class="min-w-0 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="emit('update:selected-period', $event.target.value)">
+        </label>
         <button type="button" class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="emit('toggle-color-mode')">
             <Sun v-if="isDarkMode" class="size-5" />
             <Moon v-else class="size-5" />

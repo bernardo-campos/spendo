@@ -28,8 +28,11 @@ resources/
 ## UI conventions
 
 - `AdminLayout` owns the sidebar, mobile overlay, header, main width, and slots.
-- `SpendoApp` owns `activeScreen`, color mode persistence, sidebar visibility,
-  user-menu state, data loading, mutation handlers, and error/success messages.
+- `SpendoApp` owns `activeScreen`, the global `selectedPeriod`, color mode
+  persistence, sidebar visibility, user-menu state, data loading, mutation
+  handlers, and error/success messages.
+- `AdminHeader` renders the single month selector. Dashboard, income, and expense
+  pages consume the filtered data and must not render a second period selector.
 - Existing pages receive data via props and emit actions such as
   `update:selected-period` and `create`.
 - Use semantic Tailwind tokens for shell UI: `bg-background`, `text-foreground`,

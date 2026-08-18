@@ -24,23 +24,11 @@ defineProps({
         type: Array,
         required: true,
     },
-    selectedPeriod: {
-        type: String,
-        required: true,
-    },
 });
-
-const emit = defineEmits(['update:selected-period']);
 </script>
 
 <template>
     <section class="grid gap-4 md:grid-cols-3">
-        <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
-            <label class="space-y-1 text-sm">
-                <span class="font-medium">Período</span>
-                <input :value="selectedPeriod" type="month" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" @input="emit('update:selected-period', $event.target.value)">
-            </label>
-        </article>
         <article v-for="card in cardsSummary" :key="card.title" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ card.title }}</h2>
             <p class="mt-2 text-2xl font-semibold">{{ card.value }}</p>

@@ -15,6 +15,10 @@ defineProps({
         type: Boolean,
         required: true,
     },
+    selectedPeriod: {
+        type: String,
+        required: true,
+    },
     sidebarOpen: {
         type: Boolean,
         required: true,
@@ -33,7 +37,7 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', 'toggle-user-menu']);
+const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
 </script>
 
 <template>
@@ -42,7 +46,7 @@ const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', '
         <AdminSidebar :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :open="sidebarOpen" @close="emit('set-sidebar-open', false)" @navigate="emit('navigate', $event)" />
 
         <div class="min-h-screen lg:pl-64">
-            <AdminHeader :is-dark-mode="isDarkMode" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @open-sidebar="emit('set-sidebar-open', true)" @toggle-color-mode="emit('toggle-color-mode')" @toggle-user-menu="emit('toggle-user-menu')">
+            <AdminHeader :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @open-sidebar="emit('set-sidebar-open', true)" @toggle-color-mode="emit('toggle-color-mode')" @toggle-user-menu="emit('toggle-user-menu')" @update:selected-period="emit('update:selected-period', $event)">
                 <template #user-menu="{ open }">
                     <slot name="user-menu" :open="open" />
                 </template>

@@ -22,6 +22,10 @@ resources/
         AdminLayout.vue                Shell and slot composition
         AdminSidebar.vue               Responsive navigation
         AdminHeader.vue                Theme and user-menu trigger
+      ui/tags-input/                   Primitivas Tags Input de shadcn/vue
+      ui/combobox/                     Primitivas Combobox de shadcn/vue
+    lib/
+      utils.js                         Utilidad de composición de clases de shadcn/vue
     pages/
       CardsPage.vue                    Tarjetas y ciclos de facturación
       CategoriesPage.vue               Administración de categorías
@@ -47,6 +51,12 @@ resources/
   proyectada conserva el identificador de su transacción padre, por lo que se
   edita o elimina la compra original; la cantidad de cuotas queda fija después
   de crearla.
+- El formulario de transacciones usa `TagsInput` de shadcn/vue para seleccionar
+  tags existentes por nombre. Sus chips visuales se traducen siempre a
+  `form.tag_ids`, que es el contrato de Laravel.
+- El formulario usa `Combobox` de shadcn/vue para categorías (con búsqueda),
+  forma de pago y tarjeta (sin búsqueda). Los modelos de objeto del componente
+  se traducen a los valores escalares existentes del formulario.
 - `AdminHeader` renders the single month selector. Dashboard, income, and expense
   pages consume the filtered data and must not render a second period selector.
 - Existing pages receive data via props and emit actions such as

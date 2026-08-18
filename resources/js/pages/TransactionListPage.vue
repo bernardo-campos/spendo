@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
     currencySymbol: {
         type: String,
         required: true,
@@ -9,10 +11,6 @@ defineProps({
         required: true,
     },
     formatAmount: {
-        type: Function,
-        required: true,
-    },
-    formatDate: {
         type: Function,
         required: true,
     },
@@ -31,33 +29,86 @@ defineProps({
 });
 
 const emit = defineEmits(['create']);
+
+const groupedTransactions = computed(() => {
+    const transactionsByDate = new Map();
+
+    [...props.transactions]
+        .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
+        .forEach((transaction) => {
+            const date = String(transaction.purchase_date).slice(0, 10);
+            const group = transactionsByDate.get(date) ?? {
+                date,
+                total: 0,
+                transactions: [],
+            };
+
+            group.total += Number.parseFloat(transaction.amount ?? 0) || 0;
+            group.transactions.push(transaction);
+            transactionsByDate.set(date, group);
+        });
+
+    return [...transactionsByDate.values()];
+});
+
+const formatGroupDate = (value) => new Intl.DateTimeFormat('es-AR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+}).format(new Date(`${value}T00:00:00`));
+
+const tagNames = (transaction) => (transaction.tags ?? [])
+    .map((tag) => tag.name)
+    .join(' | ');
+
+const transactionTypeLabel = (transaction) => {
+    if (transaction.type === 'income') {
+        return 'Ingreso';
+    }
+
+    return transaction.payment_method === 'credit' ? 'Crédito' : 'Efectivo';
+};
 </script>
 
 <template>
-    <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div class="mb-4">
-            <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
-        </div>
+    <section class="space-y-4">
+        <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
 
-        <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
-        <p v-else-if="transactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">{{ emptyMessage }}</p>
-        <ul v-else class="space-y-2">
-            <li v-for="transaction in transactions" :key="transaction.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                <div>
-                    <p class="font-medium">{{ transaction.description }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ formatDate(transaction.purchase_date) }}
-                        <template v-if="transaction.type === 'expense'"> · {{ transaction.payment_method === 'credit' ? 'Crédito' : 'Efectivo' }}</template>
-                    </p>
-                </div>
-                <span class="font-semibold">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
-            </li>
-        </ul>
+        <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
+            <p v-else-if="transactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">{{ emptyMessage }}</p>
+            <div v-else class="divide-y divide-slate-200 dark:divide-slate-800">
+                <section v-for="group in groupedTransactions" :key="group.date" class="py-4 first:pt-0 last:pb-0">
+                    <div class="flex items-baseline justify-between gap-4">
+                        <h3 class="text-sm font-semibold capitalize">{{ formatGroupDate(group.date) }}</h3>
+                        <span class="shrink-0 text-sm font-semibold tabular-nums">{{ currencySymbol }}{{ formatAmount(group.total) }}</span>
+                    </div>
 
-        <div class="sticky bottom-4 mt-4 flex justify-end">
-            <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="emit('create')">
-                Registrar {{ title.toLowerCase().slice(0, -1) }}
-            </button>
+                    <ul class="mt-2 space-y-3">
+                        <li v-for="transaction in group.transactions" :key="transaction.id" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 text-sm">
+                            <div class="min-w-0">
+                                <p class="truncate font-semibold">
+                                    {{ transaction.category?.name ?? 'Sin categoría' }}
+                                    <span v-if="tagNames(transaction)" class="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</span>
+                                </p>
+                                <p class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    {{ transactionTypeLabel(transaction) }}
+                                    <template v-if="transaction.installment_number"> · Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
+                                </p>
+                            </div>
+                            <span class="self-start whitespace-nowrap tabular-nums" :class="transaction.type === 'expense' ? 'text-slate-500 dark:text-slate-400' : 'font-semibold'">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
+                        </li>
+                    </ul>
+                </section>
+            </div>
+
+            <div class="sticky bottom-4 mt-4 flex justify-end">
+                <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="emit('create')">
+                    Registrar {{ title.toLowerCase().slice(0, -1) }}
+                </button>
+            </div>
         </div>
     </section>
 </template>

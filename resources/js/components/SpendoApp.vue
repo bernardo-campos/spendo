@@ -224,10 +224,14 @@ const expenseTransactions = computed(() => transactions.value
                 .filter((installment) => isInSelectedPeriod(installment.due_date))
                 .map((installment) => ({
                     id: `${transaction.id}-installment-${installment.id ?? installment.installment_number}`,
-                    description: `${transaction.description} · Cuota ${installment.installment_number}/${totalInstallments}`,
+                    category: transaction.category,
+                    description: transaction.description,
                     purchase_date: installment.due_date,
                     payment_method: transaction.payment_method,
                     amount: installment.amount,
+                    installment_number: installment.installment_number,
+                    tags: transaction.tags,
+                    total_installments: totalInstallments,
                     type: 'expense',
                 }));
         }
@@ -827,9 +831,9 @@ const removeCard = async (cardId) => {
             </div>
         </template>
 
-        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" />
+        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" />
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" />
 

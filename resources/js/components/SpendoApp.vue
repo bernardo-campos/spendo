@@ -34,6 +34,7 @@ const categories = ref([]);
 const tags = ref([]);
 const cards = ref([]);
 const transactions = ref([]);
+const loadedTransactionsPeriod = ref(null);
 
 const userInitials = computed(() => userName
     .split(' ')
@@ -389,8 +390,24 @@ const runWithLoading = async (handler, fallbackMessage) => {
 };
 
 const loadTransactions = async () => {
-    const response = await window.axios.get('/transactions');
+    const period = selectedPeriod.value;
+
+    if (loadedTransactionsPeriod.value === period) {
+        return;
+    }
+
+    const response = await window.axios.get('/transactions', {
+        params: {
+            period,
+        },
+    });
+
+    if (selectedPeriod.value !== period) {
+        return;
+    }
+
     transactions.value = response.data;
+    loadedTransactionsPeriod.value = period;
 };
 
 const loadCategories = async () => {
@@ -444,6 +461,17 @@ watch(
         }
     },
     { immediate: true }
+);
+
+watch(
+    () => selectedPeriod.value,
+    async () => {
+        if (!['dashboard', 'income-list', 'expense-list'].includes(activeScreen.value)) {
+            return;
+        }
+
+        await runWithLoading(loadTransactions, 'No fue posible cargar las transacciones.');
+    }
 );
 
 watch(
@@ -598,6 +626,7 @@ const submitTransaction = async () => {
         const registeredType = form.value.type;
 
         successMessage.value = 'Transacción guardada correctamente.';
+        loadedTransactionsPeriod.value = null;
         resetTransactionForm();
         forcedTransactionType.value = null;
         activeScreen.value = registeredType === 'income' ? 'income-list' : 'expense-list';

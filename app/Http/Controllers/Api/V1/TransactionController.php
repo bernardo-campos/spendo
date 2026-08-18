@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\PaymentMethodType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ListTransactionRequest;
 use App\Http\Requests\StoreTransactionRequest;
 use App\Http\Requests\UpdateTransactionRequest;
 use App\Http\Resources\Api\V1\TransactionResource;
@@ -13,8 +14,10 @@ use App\Models\Transaction;
 use App\Services\CardPaymentDateService;
 use App\Services\InstallmentDueDateSyncService;
 use App\Services\InstallmentPlanService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class TransactionController extends Controller
@@ -25,14 +28,39 @@ class TransactionController extends Controller
         private InstallmentDueDateSyncService $installmentDueDateSyncService,
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(ListTransactionRequest $request): JsonResponse
     {
         $user = $request->user();
+        $periodStart = Carbon::createFromFormat('!Y-m', $request->validated('period'))->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
 
         abort_if($user === null, 401);
 
         $transactions = Transaction::query()
             ->where('user_id', $user->id)
+            ->where(function (Builder $query) use ($periodStart, $periodEnd): void {
+                $query
+                    ->where(function (Builder $query) use ($periodStart, $periodEnd): void {
+                        $query
+                            ->where('type', 'income')
+                            ->whereBetween('purchase_date', [$periodStart, $periodEnd]);
+                    })
+                    ->orWhere(function (Builder $query) use ($periodStart, $periodEnd): void {
+                        $query
+                            ->where('type', 'expense')
+                            ->where(function (Builder $query) use ($periodStart, $periodEnd): void {
+                                $query
+                                    ->where(function (Builder $query) use ($periodStart, $periodEnd): void {
+                                        $query
+                                            ->whereDoesntHave('installmentPlan')
+                                            ->whereBetween('payment_date', [$periodStart, $periodEnd]);
+                                    })
+                                    ->orWhereHas('installmentPlan.installments', function (Builder $query) use ($periodStart, $periodEnd): void {
+                                        $query->whereBetween('due_date', [$periodStart, $periodEnd]);
+                                    });
+                            });
+                    });
+            })
             ->with(['category', 'card', 'tags', 'installmentPlan.installments'])
             ->latest('purchase_date');
 

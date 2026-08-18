@@ -32,6 +32,8 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
 - Botones `Registrar ingreso` y `Registrar egreso` fijos abajo.
 - Selector de período mensual (`YYYY-MM`) global en la cabecera, aplicado al
   dashboard y a los listados de ingresos y egresos.
+- Las transacciones se consultan por período (`/transactions?period=YYYY-MM`)
+  para no cargar movimientos de otros meses.
 
 ### Reglas de negocio implementadas
 - Formas de pago para egresos: `cash` y `credit`.

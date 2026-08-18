@@ -48,5 +48,8 @@ resources/
   flow.
 - The admin runs inside Laravel's authenticated `/app` experience. Do not create
   a second SPA entry or independent frontend repository for ordinary screens.
-- The current web frontend calls unprefixed endpoints such as `/transactions`.
-  The versioned API at `/api/v1` is a separate contract.
+- The current web frontend calls `/transactions?period=YYYY-MM`. The selected
+  period is required and changing it reloads dashboard, income, and expense
+  data. Navigation among those screens reuses the already loaded result for the
+  active period; saving a transaction invalidates it. The versioned API at
+  `/api/v1` is a separate contract.

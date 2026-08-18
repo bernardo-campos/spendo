@@ -106,10 +106,11 @@ formularios existentes. Las pantallas de tarjetas, categorías, etiquetas y el
 formulario de transacciones se extraerán progresivamente a `pages/` cuando se
 amplíen o se reutilicen.
 
-El template original incluye una skill de Codex, pero está diseñada para su
-estructura propia (TypeScript, Vue Router, Pinia y `src/`). Si se añade una
-skill al proyecto, debe adaptarse a Laravel, Vite y `resources/js`; Laravel
-Boost complementa esa guía, pero no instala ni sustituye skills.
+El proyecto incluye la skill local `spendo-admin` en
+`.ai/skills/spendo-admin/`. Esa es la fuente canónica que Laravel Boost conserva
+y sincroniza hacia `.agents/skills/` para Codex al ejecutar `boost:install` o
+`boost:update`. Está adaptada a Laravel, Vite y `resources/js` para que los
+cambios futuros respeten esta estructura.
 
 ## Estructura funcional (alto nivel)
 - Backend API y auth: `routes/web.php`

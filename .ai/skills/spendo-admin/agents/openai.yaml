@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spendo Admin"
+  short_description: "Mantiene el frontend administrativo de Spendo"
+  default_prompt: "Usa $spendo-admin para crear o actualizar una pantalla administrativa de Spendo."

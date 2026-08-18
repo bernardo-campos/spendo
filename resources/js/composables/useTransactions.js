@@ -24,6 +24,7 @@ export const useTransactions = (selectedPeriod) => {
                     .filter((installment) => isInSelectedPeriod(installment.due_date))
                     .map((installment) => ({
                         id: `${transaction.id}-installment-${installment.id ?? installment.installment_number}`,
+                        transaction_id: transaction.id,
                         category: transaction.category,
                         description: transaction.description,
                         purchase_date: installment.due_date,

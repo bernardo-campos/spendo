@@ -24,6 +24,8 @@ const userMenuOpen = ref(false);
 const sidebarOpen = ref(false);
 const isDarkMode = ref(false);
 const savingTransaction = ref(false);
+const deletingTransaction = ref(false);
+const editingTransactionId = ref(null);
 const savingCategory = ref(false);
 const savingTag = ref(false);
 const savingCard = ref(false);
@@ -146,6 +148,10 @@ const cardsSummary = computed(() => [
 ]);
 
 const transactionFormTitle = computed(() => {
+    if (editingTransactionId.value !== null) {
+        return form.value.type === 'income' ? 'Editar ingreso' : 'Editar egreso';
+    }
+
     if (forcedTransactionType.value === 'income') {
         return 'Registrar ingreso';
     }
@@ -213,6 +219,7 @@ const formatAmount = (value) => Number(value ?? 0).toLocaleString('es-AR', {
 
 const openTransactionForm = (type) => {
     resetTransactionForm();
+    editingTransactionId.value = null;
     forcedTransactionType.value = type;
     form.value.type = type;
     activeScreen.value = 'transaction-form';
@@ -220,8 +227,41 @@ const openTransactionForm = (type) => {
 
 const openGenericTransactionForm = () => {
     resetTransactionForm();
+    editingTransactionId.value = null;
     forcedTransactionType.value = null;
     activeScreen.value = 'transaction-form';
+};
+
+const openTransactionEdit = async (listedTransaction) => {
+    const transactionId = listedTransaction.transaction_id ?? listedTransaction.id;
+
+    await runWithLoading(async () => {
+        const response = await window.axios.get(`/transactions/${transactionId}`);
+        const transaction = response.data;
+
+        form.value.type = transaction.type;
+        form.value.description = transaction.description;
+        form.value.amount = transaction.amount;
+        form.value.category_id = transaction.category_id ?? '';
+        form.value.purchase_date = toInputDateValue(transaction.purchase_date);
+        form.value.payment_method = transaction.payment_method ?? 'cash';
+        form.value.card_id = transaction.card_id ?? '';
+        form.value.installments_count = transaction.installment_plan?.installments_count ?? 1;
+        form.value.notes = transaction.notes ?? '';
+        form.value.tag_ids = (transaction.tags ?? []).map((tag) => tag.id);
+        editingTransactionId.value = transaction.id;
+        forcedTransactionType.value = transaction.type;
+        activeScreen.value = 'transaction-form';
+    }, 'No fue posible cargar la transacción.');
+};
+
+const returnToTransactionList = () => {
+    const transactionType = form.value.type;
+
+    resetTransactionForm();
+    editingTransactionId.value = null;
+    forcedTransactionType.value = null;
+    activeScreen.value = transactionType === 'income' ? 'income-list' : 'expense-list';
 };
 
 const toggleUserMenu = () => {
@@ -490,19 +530,56 @@ const submitTransaction = async () => {
                 : {}),
         };
 
-        await window.axios.post('/transactions', payload);
+        const isEditingTransaction = editingTransactionId.value !== null;
+
+        if (isEditingTransaction) {
+            delete payload.installments_count;
+            await window.axios.put(`/transactions/${editingTransactionId.value}`, payload);
+        } else {
+            await window.axios.post('/transactions', payload);
+        }
 
         const registeredType = form.value.type;
 
-        successMessage.value = 'Transacción guardada correctamente.';
+        successMessage.value = isEditingTransaction
+            ? 'Transacción actualizada correctamente.'
+            : 'Transacción guardada correctamente.';
         invalidateTransactions();
         resetTransactionForm();
+        editingTransactionId.value = null;
         forcedTransactionType.value = null;
         activeScreen.value = registeredType === 'income' ? 'income-list' : 'expense-list';
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la transacción.';
     } finally {
         savingTransaction.value = false;
+    }
+};
+
+const deleteTransaction = async () => {
+    if (editingTransactionId.value === null || !window.confirm('¿Eliminar esta transacción? Esta acción no se puede deshacer.')) {
+        return;
+    }
+
+    deletingTransaction.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const deletedType = form.value.type;
+
+        await window.axios.delete(`/transactions/${editingTransactionId.value}`);
+
+        successMessage.value = 'Transacción eliminada correctamente.';
+        invalidateTransactions();
+        resetTransactionForm();
+        editingTransactionId.value = null;
+        forcedTransactionType.value = null;
+        activeScreen.value = deletedType === 'income' ? 'income-list' : 'expense-list';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar la transacción.';
+    } finally {
+        deletingTransaction.value = false;
     }
 };
 
@@ -681,13 +758,13 @@ const removeCard = async (cardId) => {
             </div>
         </template>
 
-        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" />
+        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" @edit="openTransactionEdit" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" @edit="openTransactionEdit" />
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" />
 
-        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-date="formatDate" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @submit="submitTransaction" />
+        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-date="formatDate" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

@@ -43,6 +43,10 @@ resources/
 - `useTransactions` encapsulates `/transactions?period=YYYY-MM`, its cache del
   período activo, loading state, normalización de cuotas y totales. Las fechas
   de pago estimadas y el uso de ciclos reales viven en `cardPaymentDates.js`.
+- Los ítems de ingresos y egresos abren el formulario de edición. Una cuota
+  proyectada conserva el identificador de su transacción padre, por lo que se
+  edita o elimina la compra original; la cantidad de cuotas queda fija después
+  de crearla.
 - `AdminHeader` renders the single month selector. Dashboard, income, and expense
   pages consume the filtered data and must not render a second period selector.
 - Existing pages receive data via props and emit actions such as

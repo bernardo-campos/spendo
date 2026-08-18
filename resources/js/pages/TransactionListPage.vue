@@ -29,7 +29,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(['create']);
+const emit = defineEmits(['create', 'edit']);
 const collapsedDates = ref(new Set());
 
 const groupedTransactions = computed(() => {
@@ -108,19 +108,21 @@ const toggleGroup = (date) => {
                         <div class="overflow-hidden">
                             <div class="mt-2 rounded-md border border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 dark:border-slate-800 dark:bg-slate-900" :class="isGroupExpanded(group.date) ? 'opacity-100' : 'opacity-0'">
                                 <ul class="space-y-3">
-                                    <li v-for="transaction in group.transactions" :key="transaction.id" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 text-sm">
-                                        <div class="min-w-0">
-                                            <p class="truncate font-semibold">
-                                                {{ transaction.category?.name ?? 'Sin categoría' }}
-                                                <span v-if="tagNames(transaction)" class="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</span>
-                                            </p>
-                                            <p class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
-                                            <p class="text-xs text-slate-500 dark:text-slate-400">
-                                                {{ transactionTypeLabel(transaction) }}
-                                                <template v-if="transaction.installment_number"> · Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
-                                            </p>
-                                        </div>
-                                        <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
+                                    <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
+                                        <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
+                                            <div class="min-w-0">
+                                                <p class="truncate font-semibold">
+                                                    {{ transaction.category?.name ?? 'Sin categoría' }}
+                                                    <span v-if="tagNames(transaction)" class="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</span>
+                                                </p>
+                                                <p class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
+                                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                                    {{ transactionTypeLabel(transaction) }}
+                                                    <template v-if="transaction.installment_number"> · Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
+                                                </p>
+                                            </div>
+                                            <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
+                                        </button>
                                     </li>
                                 </ul>
                             </div>

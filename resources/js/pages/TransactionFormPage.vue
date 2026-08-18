@@ -1,8 +1,12 @@
 <script setup>
+import { ArrowLeft } from '@lucide/vue';
+
 defineProps({
     cards: { type: Array, required: true },
     categories: { type: Array, required: true },
     categoryOptions: { type: Array, required: true },
+    deleting: { type: Boolean, required: true },
+    editing: { type: Boolean, required: true },
     firstInstallmentPaymentDate: { type: String, default: null },
     firstInstallmentPaymentDateIsEstimated: { type: Boolean, required: true },
     forcedTransactionType: { type: String, default: null },
@@ -16,13 +20,18 @@ defineProps({
     title: { type: String, required: true },
 });
 
-const emit = defineEmits(['submit']);
+const emit = defineEmits(['back', 'delete', 'submit']);
 </script>
 
 <template>
     <section class="grid gap-6">
         <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="mb-4 text-base font-semibold">{{ title }}</h2>
+            <div class="mb-4 flex items-center gap-2">
+                <button v-if="editing" type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al listado" title="Volver al listado" @click="emit('back')">
+                    <ArrowLeft class="size-4" />
+                </button>
+                <h2 class="text-base font-semibold">{{ title }}</h2>
+            </div>
             <form class="space-y-3" @submit.prevent="emit('submit')">
                 <div class="grid gap-3 sm:grid-cols-2">
                     <label v-if="!forcedTransactionType" class="space-y-1 text-sm">
@@ -84,10 +93,12 @@ const emit = defineEmits(['submit']);
                     {{ firstInstallmentPaymentDateIsEstimated ? '(fecha estimada)' : '(fecha real por ciclo cargado)' }}.
                 </p>
 
-                <label v-if="isCreditPayment" class="space-y-1 text-sm">
+                <label v-if="isCreditPayment && !editing" class="space-y-1 text-sm">
                     <span class="font-medium">Cuotas</span>
                     <input v-model.number="form.installments_count" type="number" min="1" max="120" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                 </label>
+
+                <p v-else-if="isCreditPayment" class="text-xs text-slate-500 dark:text-slate-400">La cantidad de cuotas no se puede modificar después de registrar la compra.</p>
 
                 <p v-if="showInstallments" class="text-xs text-slate-500 dark:text-slate-400">La fecha de pago se calcula automáticamente según cierre/vencimiento de la tarjeta.</p>
 
@@ -96,7 +107,10 @@ const emit = defineEmits(['submit']);
                     <textarea v-model="form.notes" rows="3" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"></textarea>
                 </label>
 
-                <button type="submit" :disabled="saving" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ saving ? 'Guardando...' : 'Guardar transacción' }}</button>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <button type="submit" :disabled="saving || deleting" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ saving ? 'Guardando...' : (editing ? 'Guardar cambios' : 'Guardar transacción') }}</button>
+                    <button v-if="editing" type="button" :disabled="saving || deleting" class="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950" @click="emit('delete')">{{ deleting ? 'Eliminando...' : 'Eliminar transacción' }}</button>
+                </div>
             </form>
         </article>
     </section>

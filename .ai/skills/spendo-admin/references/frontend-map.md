@@ -49,7 +49,10 @@ resources/
 - The admin runs inside Laravel's authenticated `/app` experience. Do not create
   a second SPA entry or independent frontend repository for ordinary screens.
 - The current web frontend calls `/transactions?period=YYYY-MM`. The selected
-  period is required and changing it reloads dashboard, income, and expense
-  data. Navigation among those screens reuses the already loaded result for the
-  active period; saving a transaction invalidates it. The versioned API at
-  `/api/v1` is a separate contract.
+  period is required and changing it always reloads its data, including when the
+  active screen is outside dashboard, income, or expense. Navigation among those
+  three screens reuses the already loaded result for the active period; saving a
+  transaction invalidates it. The sidebar receives the calculated income and
+  expense totals for that period and displays a loading placeholder while the
+  transaction request is in progress. The versioned API at `/api/v1` is a
+  separate contract.

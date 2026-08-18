@@ -18,7 +18,27 @@ defineProps({
         type: String,
         required: true,
     },
+    currencySymbol: {
+        type: String,
+        required: true,
+    },
+    expenseTotal: {
+        type: Number,
+        required: true,
+    },
+    formatAmount: {
+        type: Function,
+        required: true,
+    },
+    incomeTotal: {
+        type: Number,
+        required: true,
+    },
     open: {
+        type: Boolean,
+        required: true,
+    },
+    transactionsLoading: {
         type: Boolean,
         required: true,
     },
@@ -46,10 +66,14 @@ const emit = defineEmits(['close', 'navigate']);
             <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'income-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'income-list')">
                 <WalletCards class="size-4" />
                 Ingresos
+                <span v-if="transactionsLoading" class="ml-auto text-xs italic text-muted-foreground">Cargando...</span>
+                <span v-else class="ml-auto text-xs tabular-nums">{{ currencySymbol }}{{ formatAmount(incomeTotal) }}</span>
             </button>
             <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'expense-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'expense-list')">
                 <ReceiptText class="size-4" />
                 Egresos
+                <span v-if="transactionsLoading" class="ml-auto text-xs italic text-muted-foreground">Cargando...</span>
+                <span v-else class="ml-auto text-xs tabular-nums">{{ currencySymbol }}{{ formatAmount(expenseTotal) }}</span>
             </button>
 
             <p class="px-3 pb-2 pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuración</p>

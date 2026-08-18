@@ -10,6 +10,7 @@ const currencySymbol = rootElement?.dataset.currencySymbol ?? '$';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
 const loading = ref(false);
+const transactionsLoading = ref(false);
 const activeScreen = ref('dashboard');
 const forcedTransactionType = ref(null);
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
@@ -393,21 +394,31 @@ const loadTransactions = async () => {
     const period = selectedPeriod.value;
 
     if (loadedTransactionsPeriod.value === period) {
+        transactionsLoading.value = false;
+
         return;
     }
 
-    const response = await window.axios.get('/transactions', {
-        params: {
-            period,
-        },
-    });
+    transactionsLoading.value = true;
 
-    if (selectedPeriod.value !== period) {
-        return;
+    try {
+        const response = await window.axios.get('/transactions', {
+            params: {
+                period,
+            },
+        });
+
+        if (selectedPeriod.value !== period) {
+            return;
+        }
+
+        transactions.value = response.data;
+        loadedTransactionsPeriod.value = period;
+    } finally {
+        if (selectedPeriod.value === period) {
+            transactionsLoading.value = false;
+        }
     }
-
-    transactions.value = response.data;
-    loadedTransactionsPeriod.value = period;
 };
 
 const loadCategories = async () => {
@@ -466,10 +477,6 @@ watch(
 watch(
     () => selectedPeriod.value,
     async () => {
-        if (!['dashboard', 'income-list', 'expense-list'].includes(activeScreen.value)) {
-            return;
-        }
-
         await runWithLoading(loadTransactions, 'No fue posible cargar las transacciones.');
     }
 );
@@ -797,7 +804,7 @@ const removeCard = async (cardId) => {
 </script>
 
 <template>
-    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
+    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :currency-symbol="currencySymbol" :expense-total="expenseTotal" :format-amount="formatAmount" :income-total="incomeTotal" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :transactions-loading="transactionsLoading" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
         <template #user-menu="{ open }">
             <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
                 <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>

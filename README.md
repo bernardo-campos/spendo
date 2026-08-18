@@ -25,8 +25,8 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
 - Gestión de tags.
 
 ### Flujo UX actual
-- Barra superior única con tabs: `Dashboard`, `Ingresos`, `Egresos`.
-- Menú de usuario (Tarjetas, Categorías, Tags, Cerrar sesión)
+- Sidebar responsive para `Resumen`, `Ingresos`, `Egresos`, `Tarjetas`, `Categorías` y `Etiquetas`.
+- Cabecera con menú de usuario, cierre de sesión y selector de tema claro/oscuro.
 - Pantallas separadas para ingresos y egresos.
 - Botones `Registrar ingreso` y `Registrar egreso` fijos abajo.
 - Selector de período mensual (`YYYY-MM`) en:
@@ -84,10 +84,9 @@ principalmente en `resources/js/components/SpendoApp.vue` y
 forma automática: se revisan y adoptan de manera selectiva cuando aporten valor
 al proyecto.
 
-### Evolución recomendada
+### Estructura del frontend
 
-Para crear nuevas pantallas con el mismo diseño sin duplicar la navegación ni
-los estilos, conviene extraer gradualmente una base reutilizable:
+La base reutilizable ya está separada de las pantallas:
 
 ```text
 resources/js/
@@ -95,12 +94,17 @@ resources/js/
     AdminLayout.vue
     AdminSidebar.vue
     AdminHeader.vue
-    ui/
   pages/
     DashboardPage.vue
-    TransactionsPage.vue
-    CardsPage.vue
+    TransactionListPage.vue
+  components/
+    SpendoApp.vue
 ```
+
+`SpendoApp.vue` coordina por ahora el estado, las llamadas HTTP y los
+formularios existentes. Las pantallas de tarjetas, categorías, etiquetas y el
+formulario de transacciones se extraerán progresivamente a `pages/` cuando se
+amplíen o se reutilicen.
 
 El template original incluye una skill de Codex, pero está diseñada para su
 estructura propia (TypeScript, Vue Router, Pinia y `src/`). Si se añade una
@@ -110,6 +114,8 @@ Boost complementa esa guía, pero no instala ni sustituye skills.
 ## Estructura funcional (alto nivel)
 - Backend API y auth: `routes/web.php`
 - Front principal SPA-like: `resources/js/components/SpendoApp.vue`
+- Shell reutilizable del admin: `resources/js/components/admin/`
+- Pantallas reutilizables: `resources/js/pages/`
 - Vista de entrada app: `resources/views/app.blade.php`
 - Controladores clave:
   - `DashboardController`

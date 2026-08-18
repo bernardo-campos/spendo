@@ -1,17 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-    BarChart3,
-    CreditCard,
-    FolderTree,
-    Menu,
-    Moon,
-    ReceiptText,
-    Sun,
-    Tags,
-    WalletCards,
-    X,
-} from '@lucide/vue';
+import AdminLayout from './admin/AdminLayout.vue';
+import DashboardPage from '../pages/DashboardPage.vue';
+import TransactionListPage from '../pages/TransactionListPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
 const userName = rootElement?.dataset.userName ?? 'Usuario';
@@ -777,159 +768,23 @@ const removeCard = async (cardId) => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-background text-foreground">
-        <div v-if="sidebarOpen" class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" @click="sidebarOpen = false"></div>
-
-        <aside class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
-            <div class="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
-                <span class="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">S</span>
-                <span class="font-semibold tracking-tight">Spendo</span>
-                <button type="button" class="ml-auto rounded-md p-1.5 hover:bg-sidebar-accent lg:hidden" aria-label="Cerrar menú" @click="sidebarOpen = false">
-                    <X class="size-5" />
-                </button>
+    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :is-dark-mode="isDarkMode" :sidebar-open="sidebarOpen" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu">
+        <template #user-menu="{ open }">
+            <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
+                <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
+                <div class="my-1 border-t border-border"></div>
+                <form method="POST" action="/logout" class="w-full">
+                    <input type="hidden" name="_token" :value="csrfToken">
+                    <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>
+                </form>
             </div>
+        </template>
 
-            <nav class="flex-1 space-y-1 p-3">
-                <p class="px-3 pb-2 pt-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Finanzas</p>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'dashboard' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('dashboard')">
-                    <BarChart3 class="size-4" />
-                    Resumen
-                </button>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'income-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('income-list')">
-                    <WalletCards class="size-4" />
-                    Ingresos
-                </button>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'expense-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('expense-list')">
-                    <ReceiptText class="size-4" />
-                    Egresos
-                </button>
+        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :selected-period="selectedPeriod" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" @update:selected-period="selectedPeriod = $event" />
 
-                <p class="px-3 pb-2 pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuración</p>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'cards' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('cards')">
-                    <CreditCard class="size-4" />
-                    Tarjetas
-                </button>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'categories' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('categories')">
-                    <FolderTree class="size-4" />
-                    Categorías
-                </button>
-                <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'tags' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="setActiveScreenFromMenu('tags')">
-                    <Tags class="size-4" />
-                    Etiquetas
-                </button>
-            </nav>
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :selected-period="selectedPeriod" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" @update:selected-period="selectedPeriod = $event" />
 
-            <div class="border-t border-sidebar-border p-3 text-xs text-muted-foreground">Tu información financiera, en un solo lugar.</div>
-        </aside>
-
-        <div class="min-h-screen lg:pl-64">
-            <header class="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur lg:px-6">
-                <button type="button" class="rounded-md p-2 hover:bg-accent lg:hidden" aria-label="Abrir menú" @click="sidebarOpen = true">
-                    <Menu class="size-5" />
-                </button>
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold">Spendo</p>
-                    <p class="hidden text-xs text-muted-foreground sm:block">Administrá tus finanzas personales</p>
-                </div>
-                <button type="button" class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="toggleColorMode">
-                    <Sun v-if="isDarkMode" class="size-5" />
-                    <Moon v-else class="size-5" />
-                </button>
-                <div ref="userMenuRef" class="relative">
-                    <button type="button" class="flex items-center gap-2 rounded-md p-1.5 hover:bg-accent" @click="toggleUserMenu">
-                        <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{{ userInitials }}</span>
-                        <span class="hidden max-w-36 truncate text-sm font-medium sm:block">{{ userName }}</span>
-                    </button>
-                    <div v-if="userMenuOpen" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
-                        <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
-                        <div class="my-1 border-t border-border"></div>
-                        <form method="POST" action="/logout" class="w-full">
-                            <input type="hidden" name="_token" :value="csrfToken">
-                            <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>
-                        </form>
-                    </div>
-                </div>
-            </header>
-
-            <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
-
-            <section v-if="activeScreen === 'income-list'" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <h2 class="text-base font-semibold">Listado de ingresos</h2>
-                    <input v-model="selectedPeriod" type="month" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-                </div>
-
-                <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
-                <p v-else-if="incomeTransactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay ingresos registrados.</p>
-                <ul v-else class="space-y-2">
-                    <li v-for="transaction in incomeTransactions" :key="transaction.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                        <div>
-                            <p class="font-medium">{{ transaction.description }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(transaction.purchase_date) }}</p>
-                        </div>
-                        <span class="font-semibold">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
-                    </li>
-                </ul>
-
-                <div class="sticky bottom-4 mt-4 flex justify-end">
-                    <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="openTransactionForm('income')">
-                        Registrar ingreso
-                    </button>
-                </div>
-            </section>
-
-            <section v-if="activeScreen === 'expense-list'" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <h2 class="text-base font-semibold">Listado de egresos</h2>
-                    <input v-model="selectedPeriod" type="month" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-                </div>
-
-                <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
-                <p v-else-if="expenseTransactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay egresos registrados.</p>
-                <ul v-else class="space-y-2">
-                    <li v-for="transaction in expenseTransactions" :key="transaction.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                        <div>
-                            <p class="font-medium">{{ transaction.description }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(transaction.purchase_date) }} · {{ transaction.payment_method === 'credit' ? 'Crédito' : 'Efectivo' }}</p>
-                        </div>
-                        <span class="font-semibold">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
-                    </li>
-                </ul>
-
-                <div class="sticky bottom-4 mt-4 flex justify-end">
-                    <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="openTransactionForm('expense')">
-                        Registrar egreso
-                    </button>
-                </div>
-            </section>
-
-            <section v-if="activeScreen === 'dashboard'" class="grid gap-4 md:grid-cols-3">
-                <article class="md:col-span-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <label class="space-y-1 text-sm">
-                        <span class="font-medium">Período</span>
-                        <input v-model="selectedPeriod" type="month" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                    </label>
-                </article>
-                <article v-for="card in cardsSummary" :key="card.title" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ card.title }}</h2>
-                    <p class="mt-2 text-2xl font-semibold">{{ card.value }}</p>
-                </article>
-            </section>
-
-            <section v-if="activeScreen === 'dashboard'" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <h2 class="mb-4 text-base font-semibold">Últimos movimientos</h2>
-                <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
-                <p v-else-if="dashboardRecentTransactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">Aún no hay transacciones.</p>
-                <ul v-else class="space-y-2">
-                    <li v-for="transaction in dashboardRecentTransactions" :key="transaction.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                        <div>
-                            <p class="font-medium">{{ transaction.description }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ transaction.type === 'expense' ? 'Gasto' : 'Ingreso' }} · {{ formatDate(transaction.purchase_date) }}</p>
-                        </div>
-                        <span class="font-semibold">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
-                    </li>
-                </ul>
-            </section>
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" :selected-period="selectedPeriod" @update:selected-period="selectedPeriod = $event" />
 
             <section v-if="activeScreen === 'transaction-form'" class="grid gap-6">
                 <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1144,7 +999,5 @@ const removeCard = async (cardId) => {
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>
-        </main>
-        </div>
-    </div>
+    </AdminLayout>
 </template>

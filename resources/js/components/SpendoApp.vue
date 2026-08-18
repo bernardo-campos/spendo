@@ -817,6 +817,9 @@ const removeCard = async (cardId) => {
             <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
                 <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
                 <div class="my-1 border-t border-border"></div>
+                <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent sm:hidden" @click="toggleColorMode">
+                    {{ isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro' }}
+                </button>
                 <form method="POST" action="/logout" class="w-full">
                     <input type="hidden" name="_token" :value="csrfToken">
                     <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>

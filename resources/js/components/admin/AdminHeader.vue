@@ -37,16 +37,18 @@ const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu
             <span class="sr-only">Período</span>
             <input :value="selectedPeriod" type="month" class="min-w-0 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="emit('update:selected-period', $event.target.value)">
         </label>
-        <button type="button" class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="emit('toggle-color-mode')">
-            <Sun v-if="isDarkMode" class="size-5" />
-            <Moon v-else class="size-5" />
-        </button>
-        <div class="relative">
-            <button type="button" class="flex items-center gap-2 rounded-md p-1.5 hover:bg-accent" @click="emit('toggle-user-menu')">
-                <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{{ userInitials }}</span>
-                <span class="hidden max-w-36 truncate text-sm font-medium sm:block">{{ userName }}</span>
+        <div class="ml-auto flex items-center gap-3">
+            <button type="button" class="hidden rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground sm:block" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="emit('toggle-color-mode')">
+                <Sun v-if="isDarkMode" class="size-5" />
+                <Moon v-else class="size-5" />
             </button>
-            <slot name="user-menu" :open="userMenuOpen" />
+            <div class="relative">
+                <button type="button" class="flex items-center gap-2 rounded-md p-1.5 hover:bg-accent" @click="emit('toggle-user-menu')">
+                    <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{{ userInitials }}</span>
+                    <span class="hidden max-w-36 truncate text-sm font-medium sm:block">{{ userName }}</span>
+                </button>
+                <slot name="user-menu" :open="userMenuOpen" />
+            </div>
         </div>
     </header>
 </template>

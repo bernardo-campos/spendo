@@ -31,6 +31,12 @@ const PAYMENT_METHODS = [
     { value: 'credit', label: 'Crédito' },
 ];
 
+const CATEGORY_SCOPE_LABELS = {
+    both: 'Ambos',
+    expense: 'Gasto',
+    income: 'Ingreso',
+};
+
 const categories = ref([]);
 const tags = ref([]);
 const cards = ref([]);
@@ -87,6 +93,8 @@ const normalizeSlug = (value) => value
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+const categoryScopeLabel = (scope) => CATEGORY_SCOPE_LABELS[scope] ?? scope;
 
 const categoryOptions = computed(() => {
     if (form.value.type === 'income') {
@@ -1000,7 +1008,7 @@ const removeCard = async (cardId) => {
                         <li v-for="category in categories" :key="category.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
                             <div>
                                 <p class="font-medium">{{ category.name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ category.scope }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ categoryScopeLabel(category.scope) }}</p>
                             </div>
                             <div class="flex gap-2">
                                 <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="editCategory(category)">Editar</button>

@@ -15,7 +15,7 @@
                     <p class="text-sm text-slate-500 dark:text-slate-400">Accede para gestionar tus gastos e ingresos.</p>
                 </header>
 
-                <form method="POST" action="{{ route('login.store') }}" class="space-y-4">
+                <form method="POST" action="{{ route('login.store') }}" class="space-y-4" data-login-form>
                     @csrf
 
                     <div class="space-y-1">
@@ -49,8 +49,9 @@
                         Mantener sesión iniciada
                     </label>
 
-                    <button type="submit" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
-                        Entrar
+                    <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-login-submit>
+                        <span class="hidden size-4 animate-spin rounded-full border-2 border-current border-t-transparent" data-login-spinner aria-hidden="true"></span>
+                        <span data-login-label>Entrar</span>
                     </button>
                 </form>
 
@@ -60,5 +61,40 @@
                 </p>
             </section>
         </main>
+
+        <script>
+            const loginForm = document.querySelector('[data-login-form]');
+            const loginButton = document.querySelector('[data-login-submit]');
+            const loginSpinner = document.querySelector('[data-login-spinner]');
+            const loginLabel = document.querySelector('[data-login-label]');
+
+            const resetLoginButton = () => {
+                loginForm?.removeAttribute('data-submitting');
+                loginButton?.removeAttribute('disabled');
+                loginButton?.removeAttribute('aria-busy');
+                loginSpinner?.classList.add('hidden');
+
+                if (loginLabel) {
+                    loginLabel.textContent = 'Entrar';
+                }
+            };
+
+            loginForm?.addEventListener('submit', () => {
+                if (!loginForm.checkValidity() || loginForm.dataset.submitting === 'true') {
+                    return;
+                }
+
+                loginForm.dataset.submitting = 'true';
+                loginButton?.setAttribute('disabled', 'disabled');
+                loginButton?.setAttribute('aria-busy', 'true');
+                loginSpinner?.classList.remove('hidden');
+
+                if (loginLabel) {
+                    loginLabel.textContent = 'Ingresando...';
+                }
+            });
+
+            window.addEventListener('pageshow', resetLoginButton);
+        </script>
     </body>
 </html>

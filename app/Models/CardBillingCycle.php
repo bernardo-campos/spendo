@@ -25,8 +25,8 @@ class CardBillingCycle extends Model
     protected function casts(): array
     {
         return [
-            'closing_date' => 'date',
-            'due_date' => 'date',
+            'closing_date' => 'date:Y-m-d',
+            'due_date' => 'date:Y-m-d',
         ];
     }
 

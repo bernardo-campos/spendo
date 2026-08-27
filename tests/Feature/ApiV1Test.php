@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Card;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
@@ -137,4 +138,34 @@ test('api v1 exposes the CRUD resource families', function () {
     ])->assertSuccessful();
 
     $this->deleteJson('/api/v1/installment-plans/'.$planResponse->json('data.id'))->assertNoContent();
+});
+
+test('billing cycle dates are serialized without a time or timezone', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa',
+        'last_four_digits' => '1234',
+        'closing_day' => 10,
+        'due_day' => 20,
+        'is_active' => true,
+    ]);
+
+    $card->billingCycles()->create([
+        'closing_date' => '2026-03-10',
+        'due_date' => '2026-03-20',
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/cards')
+        ->assertSuccessful()
+        ->assertJsonPath('0.billing_cycles.0.closing_date', '2026-03-10')
+        ->assertJsonPath('0.billing_cycles.0.due_date', '2026-03-20');
+
+    Sanctum::actingAs($user);
+
+    $this->getJson("/api/v1/cards/{$card->id}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.billing_cycles.0.closing_date', '2026-03-10')
+        ->assertJsonPath('data.billing_cycles.0.due_date', '2026-03-20');
 });

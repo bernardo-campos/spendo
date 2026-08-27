@@ -17,8 +17,8 @@ class CardBillingCycleResource extends JsonResource
         return [
             'id' => $this->id,
             'card_id' => $this->card_id,
-            'closing_date' => $this->closing_date,
-            'due_date' => $this->due_date,
+            'closing_date' => $this->closing_date?->toDateString(),
+            'due_date' => $this->due_date?->toDateString(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

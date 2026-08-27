@@ -24,6 +24,7 @@ resources/
         AdminHeader.vue                Theme and user-menu trigger
       ui/tags-input/                   Primitivas Tags Input de shadcn/vue
       ui/combobox/                     Primitivas Combobox de shadcn/vue
+      ui/dialog/                       Primitivas Dialog de shadcn/vue
     lib/
       utils.js                         Utilidad de composición de clases de shadcn/vue
     pages/
@@ -34,6 +35,7 @@ resources/
       TransactionFormPage.vue          Formulario de ingresos y egresos
       TransactionListPage.vue          Reusable income/expense list
     utils/
+      billingCycles.js                 Ciclos reales y proyecciones de tarjetas
       cardPaymentDates.js              Cálculos puros de fechas de cuotas
 ```
 
@@ -57,6 +59,10 @@ resources/
 - El formulario usa `Combobox` de shadcn/vue para categorías (con búsqueda),
   forma de pago y tarjeta (sin búsqueda). Los modelos de objeto del componente
   se traducen a los valores escalares existentes del formulario.
+- Las tarjetas combinan ciclos cargados y proyecciones mensuales. El anterior
+  es el último vencido, el actual es el próximo vencimiento y el siguiente es
+  el primer cierre posterior a ese vencimiento. El historial completo se abre
+  en un `Dialog` de shadcn/vue; los ciclos estimados no son editables.
 - `AdminHeader` renders the single month selector. Dashboard, income, and expense
   pages consume the filtered data and must not render a second period selector.
 - Existing pages receive data via props and emit actions such as

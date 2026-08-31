@@ -13,6 +13,8 @@ test('guests can render the authentication views', function () {
     $this->get('/login')
         ->assertSuccessful()
         ->assertSee('Iniciar sesión')
+        ->assertSee('href="'.asset('favicon.ico').'"', false)
+        ->assertSee('href="'.asset('site.webmanifest').'"', false)
         ->assertSee('Recordar mi cuenta')
         ->assertSee('<hr', false)
         ->assertSeeInOrder(['¿Olvidaste tu contraseña?', '¿No tienes cuenta?']);

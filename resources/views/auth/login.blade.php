@@ -15,6 +15,12 @@
                     <p class="text-sm text-slate-500 dark:text-slate-400">Accede para gestionar tus gastos e ingresos.</p>
                 </header>
 
+                @if (session('status'))
+                    <p class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        {{ session('status') }}
+                    </p>
+                @endif
+
                 <form method="POST" action="{{ route('login.store') }}" class="space-y-4" data-login-form>
                     @csrf
 
@@ -42,11 +48,14 @@
                             required
                             class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950"
                         >
+                        @error('password')
+                            <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                        <input type="checkbox" name="remember" value="1" class="rounded border-slate-300 dark:border-slate-700">
-                        Mantener sesión iniciada
+                        <input type="checkbox" name="remember" value="1" @checked(old('remember')) class="rounded border-slate-300 dark:border-slate-700">
+                        Recordar mi cuenta
                     </label>
 
                     <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-login-submit>
@@ -55,7 +64,13 @@
                     </button>
                 </form>
 
-                <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                <p class="mt-4 text-sm">
+                    <a href="{{ route('password.request') }}" class="font-medium underline">¿Olvidaste tu contraseña?</a>
+                </p>
+
+                <hr class="my-4 border-slate-200 dark:border-slate-800">
+
+                <p class="text-sm text-slate-600 dark:text-slate-300">
                     ¿No tienes cuenta?
                     <a href="{{ route('register') }}" class="font-medium underline">Regístrate</a>
                 </p>

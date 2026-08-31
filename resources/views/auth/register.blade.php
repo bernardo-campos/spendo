@@ -38,13 +38,16 @@
                         <label for="password" class="text-sm font-medium">Contraseña</label>
                         <input id="password" name="password" type="password" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950">
                         @error('password')
-                            <p class="text-xs text-red-600">{{ $message }}</p>
+                            <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                         @enderror
                     </div>
 
                     <div class="space-y-1">
                         <label for="password_confirmation" class="text-sm font-medium">Confirmar contraseña</label>
                         <input id="password_confirmation" name="password_confirmation" type="password" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950">
+                        @error('password_confirmation')
+                            <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <button type="submit" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">

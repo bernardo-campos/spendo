@@ -1,8 +1,9 @@
 # Especificacion Tecnica del Proyecto Spendo
 
 ## 1. Resumen tecnico
-- Framework backend: Laravel 12.
+- Framework backend: Laravel 13.
 - Lenguaje backend: PHP 8.3.
+- Autenticacion: Laravel Fortify 1.
 - Frontend: Vue 3 + Axios + Vite 7.
 - Estilos: Tailwind CSS v4.
 - Base de datos: MariaDB.
@@ -19,6 +20,10 @@ Arquitectura aplicada:
 - Vistas Blade para auth y shell de app:
   - `resources/views/auth/login.blade.php`
   - `resources/views/auth/register.blade.php`
+  - `resources/views/auth/forgot-password.blade.php`
+  - `resources/views/auth/reset-password.blade.php`
+  - `resources/views/auth/confirm-password.blade.php`
+  - `resources/views/auth/verify-email.blade.php`
   - `resources/views/app.blade.php`
 - Componente principal Vue:
   - `resources/js/components/SpendoApp.vue`
@@ -28,7 +33,6 @@ Arquitectura aplicada:
 
 ### 2.2 Capa HTTP/API
 Controladores REST + controlador invocable para dashboard:
-- `AuthController`
 - `DashboardController`
 - `CategoryController`
 - `TagController`
@@ -37,7 +41,10 @@ Controladores REST + controlador invocable para dashboard:
 - `TransactionController`
 - `InstallmentPlanController`
 
-Validacion en Form Requests dedicados (excepto update de installment plan, que valida inline en controlador).
+Fortify registra las rutas y controladores de autenticacion. `FortifyServiceProvider`
+asocia las vistas y acciones propias; `CreateNewUser` valida los datos de alta y
+Turnstile antes de persistir al usuario. El resto de entradas usa Form Requests
+dedicados (excepto update de installment plan, que valida inline en controlador).
 
 ### 2.3 Capa de dominio/negocio
 Servicios de negocio:
@@ -53,16 +60,24 @@ Servicios de negocio:
 ## 3. Routing y seguridad
 
 ## 3.1 Rutas web
-Definidas en `routes/web.php`:
+Las rutas de aplicacion se definen en `routes/web.php` y las de autenticacion
+son registradas por Fortify:
 - `/` redirige a `app` o `login` segun sesion.
-- Grupo `guest`:
+- Rutas publicas/guest de Fortify:
   - `GET /login`
   - `POST /login`
   - `GET /register`
   - `POST /register`
-- Grupo `auth`:
-  - `GET /app` (vista app)
+  - `GET|POST /forgot-password`
+  - `GET|POST /reset-password`
+- Rutas autenticadas de Fortify:
   - `POST /logout`
+  - `GET /email/verify`
+  - `GET /email/verify/{id}/{hash}`
+  - `POST /email/verification-notification`
+  - `GET|POST /user/confirm-password`
+- Grupo `auth` + `verified` de la aplicacion:
+  - `GET /app` (vista app)
 
 ## 3.2 Rutas API autenticadas
 Bajo prefijo `/api` y middleware `auth`:
@@ -76,7 +91,14 @@ Bajo prefijo `/api` y middleware `auth`:
 
 ## 3.3 Mecanismos de seguridad
 - Autenticacion por sesion Laravel.
+- Laravel Fortify como unico backend de registro, login, logout, recuperacion,
+  restablecimiento, confirmacion de contrasena y verificacion de email.
 - CSRF token en formularios Blade y cabecera Axios (`X-CSRF-TOKEN`).
+- Registro protegido con Cloudflare Turnstile Managed visible. La validacion
+  server-side exige `success=true`, `action=register` y coincidencia de hostname.
+- Turnstile utiliza timeout de conexion de 2 segundos, timeout total de 5
+  segundos y reintentos breves solo ante errores de conexion o respuestas 5xx.
+- La politica es fail-closed y los logs omiten tokens, secretos y credenciales.
 - Aislamiento por usuario en controladores con checks de `user_id` + `abort_unless`.
 - Validaciones de pertenencia de recursos con reglas `exists(...)->where(user_id)`.
 
@@ -142,8 +164,13 @@ Valores operativos adicionales:
 ## 6. Validaciones y contratos de entrada
 
 ## 6.1 Auth
-- LoginRequest: `email`, `password`, `remember?`.
-- RegisterRequest: `name`, `email` unico, `password` confirmada y min 8.
+- Fortify procesa login con `email`, `password` y `remember?`; la opcion de
+  recordar se procesa separada de las credenciales.
+- `CreateNewUser`: `name`, `email` unico, `password` confirmada y
+  `cf-turnstile-response` obligatorio (`string`, maximo 2048).
+- `ValidTurnstile` delega en `TurnstileVerifier` la comprobacion remota contra
+  Siteverify antes de crear o autenticar al usuario.
+- El email debe verificarse para acceder a las rutas de la aplicacion.
 
 ## 6.2 Catalogos
 - Category:
@@ -258,18 +285,29 @@ Algoritmo:
 - `currency` (env `SPENDO_CURRENCY`, default `USD`).
 - `currency_symbol` (env `SPENDO_CURRENCY_SYMBOL`, default `$`).
 
+`config/services.php`:
+- `turnstile.site_key` (env `TURNSTILE_SITE_KEY`): clave publica renderizada en el widget.
+- `turnstile.secret_key` (env `TURNSTILE_SECRET_KEY`): secreto exclusivo del servidor.
+- `turnstile.expected_hostname` (env `TURNSTILE_EXPECTED_HOSTNAME`, fallback al host de `APP_URL`).
+- `turnstile.action`: `register`.
+- `turnstile.verify_url`: endpoint Siteverify oficial.
+
 ## 9.2 Build/runtime
 - `composer run dev`: server + queue listener + vite en paralelo.
 - `npm run dev`: vite dev server.
 - `npm run build`: build produccion assets.
 
-## 9.3 Bootstrap Laravel 12
+## 9.3 Bootstrap Laravel 13
 - `bootstrap/app.php` configura routing web/console y endpoint health (`/up`).
 - Middleware y excepciones sin customizaciones extra (defaults).
 
 ## 10. Pruebas y cobertura actual
 Pruebas Pest implementadas para:
-- Flujo de autenticacion (registro + login).
+- Flujo Fortify: registro, login, remember, logout, recuperacion/restablecimiento,
+  confirmacion de contrasena y verificacion de email.
+- Turnstile: renderizado seguro del widget, payload de Siteverify, respuesta
+  exitosa, token ausente/rechazado/reutilizado, action y hostname incorrectos,
+  claves faltantes, fallos de conexion/timeouts y respuestas 5xx.
 - Restriccion de borrado de tarjeta con transacciones asociadas.
 - Sincronizacion de cuotas estimadas a reales al cargar ciclos de facturacion.
 - Logica de reparto de montos en cuotas (incluyendo residuo).

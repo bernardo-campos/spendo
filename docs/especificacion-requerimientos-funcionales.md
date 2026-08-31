@@ -24,10 +24,14 @@ No se cubren funcionalidades de colaboracion multiusuario, presupuestos, exporta
 ### RF-01 Registro de cuenta
 - El visitante puede crear una cuenta con nombre, email, contrasena y confirmacion.
 - Al registrarse correctamente, el sistema inicia sesion automaticamente y redirige a la aplicacion principal.
+- El registro exige completar el desafio visible Cloudflare Turnstile antes de crear la cuenta.
+- Si el desafio no puede validarse, se conservan nombre y email, se muestra un mensaje generico y no se crea ningun usuario.
+- Tras el registro se envia una notificacion para verificar el email. El acceso a la aplicacion requiere que el email este verificado.
 - Validaciones:
   - `name` obligatorio, maximo 255.
   - `email` obligatorio, formato email, unico.
   - `password` obligatorio, minimo 8, confirmada.
+  - `cf-turnstile-response` obligatorio, maximo 2048 caracteres y validado remotamente.
 
 ### RF-02 Inicio de sesion
 - El visitante puede iniciar sesion con email y contrasena.
@@ -37,6 +41,11 @@ No se cubren funcionalidades de colaboracion multiusuario, presupuestos, exporta
 ### RF-03 Cierre de sesion
 - El usuario autenticado puede cerrar sesion desde el menu de usuario.
 - El sistema invalida la sesion y regenera token CSRF.
+
+### RF-03A Recuperacion y confirmacion de contrasena
+- El visitante puede solicitar un enlace de recuperacion por email.
+- El usuario puede restablecer la contrasena con un token valido.
+- Las operaciones sensibles pueden solicitar la confirmacion de la contrasena actual.
 
 ### RF-04 Navegacion principal
 - Pantallas principales por tabs:
@@ -153,15 +162,18 @@ No se cubren funcionalidades de colaboracion multiusuario, presupuestos, exporta
 - Formato de montos en locale `es-AR` en frontend.
 - Formato de fechas en visualizacion `dd/mm/yyyy`.
 - Seguridad por sesion y CSRF en formularios y peticiones.
+- Registro protegido por Cloudflare Turnstile con verificacion obligatoria en servidor.
+- La validacion anti-bot bloquea el registro ante token invalido, vencido o reutilizado, hostname/accion incorrectos, configuracion incompleta o indisponibilidad del servicio.
+- El secreto de Turnstile nunca se expone en el navegador.
 
 ## 7. Limites de la version actual
-- No existe recuperacion de contrasena.
 - No hay administracion de usuarios ni roles.
 - No hay edicion/eliminacion de transacciones en la UI principal (aunque existen endpoints API para update/delete).
 - No hay modulo de presupuestos, metas ni exportacion de datos.
 
 ## 8. Criterios de aceptacion globales (estado actual)
-- Usuario puede registrarse, iniciar sesion y operar la app sin acceder a datos de otros usuarios.
+- Usuario humano puede registrarse superando Turnstile, verificar su email, iniciar sesion y operar la app sin acceder a datos de otros usuarios.
+- Un registro sin validacion satisfactoria de Turnstile no crea ni autentica usuarios.
 - Usuario puede crear y consultar ingresos y egresos por periodo mensual.
 - Usuario puede usar pago con credito y obtener calculo de fecha de pago/plan de cuotas.
 - Usuario puede mantener catalogos de categorias, tags y tarjetas.

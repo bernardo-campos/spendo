@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -43,7 +44,20 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function fakeSuccessfulTurnstile(): void
 {
-    // ..
+    config([
+        'services.turnstile.site_key' => 'test-site-key',
+        'services.turnstile.secret_key' => 'test-secret-key',
+        'services.turnstile.expected_hostname' => 'localhost',
+    ]);
+
+    Http::fake([
+        'challenges.cloudflare.com/*' => Http::response([
+            'success' => true,
+            'hostname' => 'localhost',
+            'action' => 'register',
+            'error-codes' => [],
+        ]),
+    ]);
 }

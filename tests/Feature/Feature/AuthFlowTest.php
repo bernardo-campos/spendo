@@ -51,11 +51,14 @@ test('authentication views enforce guest and auth middleware', function () {
 });
 
 test('guest can register and gets redirected to app', function () {
+    fakeSuccessfulTurnstile();
+
     $this->post('/register', [
         'name' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
+        'cf-turnstile-response' => 'valid-turnstile-token',
     ])->assertRedirect('/app');
 
     $this->assertAuthenticated();
@@ -67,6 +70,8 @@ test('guest can register and gets redirected to app', function () {
 });
 
 test('registration validates duplicate email and password confirmation', function () {
+    fakeSuccessfulTurnstile();
+
     User::factory()->create(['email' => 'existing@example.com']);
 
     $this->post('/register', [
@@ -74,6 +79,7 @@ test('registration validates duplicate email and password confirmation', functio
         'email' => 'existing@example.com',
         'password' => 'password123',
         'password_confirmation' => 'different-password',
+        'cf-turnstile-response' => 'valid-turnstile-token',
     ])->assertSessionHasErrors(['email', 'password']);
 
     $this->assertGuest();

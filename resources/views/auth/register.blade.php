@@ -6,6 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>Registro · {{ config('app.name', 'Spendo') }}</title>
         @include('partials.favicons')
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
         @vite(['resources/css/app.css'])
     </head>
     <body class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -47,6 +48,19 @@
                         <label for="password_confirmation" class="text-sm font-medium">Confirmar contraseña</label>
                         <input id="password_confirmation" name="password_confirmation" type="password" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950">
                         @error('password_confirmation')
+                            <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="space-y-1">
+                        <div
+                            class="cf-turnstile"
+                            data-sitekey="{{ config('services.turnstile.site_key') }}"
+                            data-action="register"
+                            data-theme="auto"
+                            data-size="flexible"
+                        ></div>
+                        @error('cf-turnstile-response')
                             <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                         @enderror
                     </div>

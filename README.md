@@ -1,11 +1,13 @@
 # Spendo
 
-Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjetas, categorías y tags), construida con Laravel 12 + Vue 3.
+Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjetas, categorías y tags), construida con Laravel 13 + Vue 3.
 
 ## Estado actual (versión implementada)
 
 ### Funcionalidades principales
-- Autenticación de usuarios (registro, login, logout).
+- Autenticación con Laravel Fortify: registro protegido por Cloudflare Turnstile,
+  verificación de email, login con sesión persistente, logout y recuperación de
+  contraseña.
 - Dashboard con resumen de:
   - ingresos,
   - egresos,
@@ -57,7 +59,8 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
 
 ## Stack técnico
 - PHP `8.3`
-- Laravel `12`
+- Laravel `13`
+- Laravel Fortify `1`
 - Vue `3`
 - Vite `7`
 - Tailwind CSS `4`
@@ -133,6 +136,16 @@ Archivo de configuración propio:
 Variables de entorno disponibles:
 - `SPENDO_CURRENCY` (default: `USD`)
 - `SPENDO_CURRENCY_SYMBOL` (default: `$`)
+- `TURNSTILE_SITE_KEY`: clave pública del widget de Cloudflare Turnstile.
+- `TURNSTILE_SECRET_KEY`: clave privada utilizada únicamente por el servidor.
+- `TURNSTILE_EXPECTED_HOSTNAME`: hostname esperado en la validación de
+  Turnstile. Si se omite, se obtiene de `APP_URL`.
+
+El registro aplica una política *fail-closed*: no crea el usuario si Turnstile
+rechaza el token, la configuración está incompleta o Cloudflare no está
+disponible. Las claves reales deben configurarse fuera del repositorio. Para
+desarrollo manual pueden utilizarse las [claves de prueba oficiales de
+Turnstile](https://developers.cloudflare.com/turnstile/troubleshooting/testing/).
 
 ## Instalación y puesta en marcha
 
@@ -154,7 +167,8 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-Configurar credenciales de base de datos en `.env`, luego ejecutar:
+Configurar las credenciales de base de datos, `APP_URL` y las claves de
+Turnstile en `.env`, luego ejecutar:
 ```bash
 php artisan migrate
 ```
@@ -193,7 +207,9 @@ Rutas bajo middleware `auth` y prefijo `/api`:
 
 ## Calidad y pruebas
 - El proyecto usa Pest para pruebas.
-- Incluye cobertura de flujo de autenticación.
+- Incluye cobertura del flujo Fortify: registro, Turnstile, verificación de
+  email, login, sesión persistente, logout, recuperación/restablecimiento y
+  confirmación de contraseña.
 - Incluye pruebas para restricción de eliminación de tarjetas asociadas a transacciones.
 
 ## Notas

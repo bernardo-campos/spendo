@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+        'expected_hostname' => env('TURNSTILE_EXPECTED_HOSTNAME')
+            ?: parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST),
+        'action' => 'register',
+        'verify_url' => 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+    ],
+
 ];

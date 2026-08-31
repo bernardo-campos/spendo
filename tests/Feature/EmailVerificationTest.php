@@ -13,12 +13,14 @@ uses(LazilyRefreshDatabase::class);
 
 test('registration sends an email verification notification', function () {
     Notification::fake();
+    fakeSuccessfulTurnstile();
 
     $this->post('/register', [
         'name' => 'Unverified User',
         'email' => 'unverified@example.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
+        'cf-turnstile-response' => 'valid-turnstile-token',
     ])->assertRedirect('/app');
 
     $user = User::query()->where('email', 'unverified@example.com')->firstOrFail();

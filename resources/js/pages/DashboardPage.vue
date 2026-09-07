@@ -1,4 +1,6 @@
 <script setup>
+import { Plus } from '@lucide/vue';
+
 defineProps({
     cardsSummary: {
         type: Array,
@@ -25,6 +27,8 @@ defineProps({
         required: true,
     },
 });
+
+const emit = defineEmits(['create-expense']);
 </script>
 
 <template>
@@ -49,4 +53,10 @@ defineProps({
             </li>
         </ul>
     </section>
+
+    <div class="sticky bottom-4 mt-4 flex justify-end">
+        <button type="button" class="flex size-12 items-center justify-center rounded-full bg-slate-900 text-2xl font-medium leading-none text-white shadow-md hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-950" aria-label="Registrar egreso" title="Registrar egreso" @click="emit('create-expense')">
+            <Plus class="size-6" :stroke-width="2.5" aria-hidden="true" />
+        </button>
+    </div>
 </template>

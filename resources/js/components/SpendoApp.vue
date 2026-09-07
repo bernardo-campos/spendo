@@ -1,7 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { useAsyncAction } from '../composables/useAsyncAction';
+import { useCatalogs } from '../composables/useCatalogs';
+import { useCatalogManagement } from '../composables/useCatalogManagement';
+import { useColorMode } from '../composables/useColorMode';
+import { useNavigation } from '../composables/useNavigation';
+import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
-import { calculateFirstInstallmentPaymentDate, hasRealCycleForPurchaseDate } from '../utils/cardPaymentDates';
 import AdminLayout from './admin/AdminLayout.vue';
 import CardsPage from '../pages/CardsPage.vue';
 import CategoriesPage from '../pages/CategoriesPage.vue';
@@ -15,38 +20,24 @@ const userName = rootElement?.dataset.userName ?? 'Usuario';
 const currencySymbol = rootElement?.dataset.currencySymbol ?? '$';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
-const loading = ref(false);
-const activeScreen = ref('dashboard');
-const forcedTransactionType = ref(null);
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
 const userMenuRef = ref(null);
 const userMenuOpen = ref(false);
 const sidebarOpen = ref(false);
-const isDarkMode = ref(false);
 const savingTransaction = ref(false);
 const deletingTransaction = ref(false);
-const editingTransactionId = ref(null);
-const savingCategory = ref(false);
-const savingTag = ref(false);
-const savingCard = ref(false);
-const savingBillingCycle = ref(false);
-const errorMessage = ref('');
-const successMessage = ref('');
+const { errorMessage, loading, runWithLoading, successMessage } = useAsyncAction();
+const { isDarkMode, toggleColorMode } = useColorMode();
 
-const PAYMENT_METHODS = [
-    { value: 'cash', label: 'Efectivo' },
-    { value: 'credit', label: 'Crédito' },
-];
-
-const CATEGORY_SCOPE_LABELS = {
-    both: 'Ambos',
-    expense: 'Gasto',
-    income: 'Ingreso',
-};
-
-const categories = ref([]);
-const tags = ref([]);
-const cards = ref([]);
+const {
+    cards,
+    categories,
+    ensureTransactionFormData,
+    loadCards,
+    loadCategories,
+    loadTags,
+    tags,
+} = useCatalogs();
 const {
     dashboardRecentTransactions,
     expenseTotal,
@@ -79,66 +70,71 @@ const form = ref({
     tag_ids: [],
 });
 
-const categoryForm = ref({
-    id: null,
-    name: '',
-    scope: 'both',
+const {
+    activePrimaryTab,
+    activeScreen,
+    editingTransactionId,
+    forcedTransactionType,
+    openGenericTransactionForm,
+    openTransactionForm,
+    returnToTransactionList,
+    setActiveScreenFromMenu: navigateToScreen,
+} = useNavigation({ form });
+
+const {
+    categoryOptions,
+    firstInstallmentPaymentDate,
+    firstInstallmentPaymentDateIsEstimated,
+    isCreditPayment,
+    PAYMENT_METHODS,
+    resetTransactionForm,
+    showInstallments,
+    transactionFormTitle,
+} = useTransactionForm({
+    cards,
+    categories,
+    editingTransactionId,
+    forcedTransactionType,
+    form,
 });
 
-const tagForm = ref({
-    id: null,
-    name: '',
-});
-
-const cardForm = ref({
-    id: null,
-    name: '',
-    last_four_digits: '',
-    closing_day: '',
-    due_day: '',
-    is_active: true,
-});
-
-const billingCycleForms = ref({});
-
-const normalizeSlug = (value) => value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-const categoryScopeLabel = (scope) => CATEGORY_SCOPE_LABELS[scope] ?? scope;
-
-const categoryOptions = computed(() => {
-    if (form.value.type === 'income') {
-        return categories.value.filter((category) => category.scope === 'income' || category.scope === 'both');
-    }
-
-    return categories.value.filter((category) => category.scope === 'expense' || category.scope === 'both');
-});
-
-const isCreditPayment = computed(() => form.value.type === 'expense' && form.value.payment_method === 'credit');
-
-const selectedCard = computed(() => cards.value.find((card) => Number(card.id) === Number(form.value.card_id)) ?? null);
-
-const showInstallments = computed(() => isCreditPayment.value && Number(form.value.installments_count) > 1);
-
-const firstInstallmentPaymentDate = computed(() => {
-    if (!isCreditPayment.value || selectedCard.value === null) {
-        return null;
-    }
-
-    return calculateFirstInstallmentPaymentDate(form.value.purchase_date, selectedCard.value);
-});
-
-const firstInstallmentPaymentDateIsEstimated = computed(() => {
-    if (!isCreditPayment.value || selectedCard.value === null) {
-        return false;
-    }
-
-    return !hasRealCycleForPurchaseDate(form.value.purchase_date, selectedCard.value);
+const {
+    billingCycleForms,
+    cardForm,
+    categoryForm,
+    categoryScopeLabel,
+    editBillingCycle,
+    editCard,
+    editCategory,
+    editTag,
+    getBillingCycleForm,
+    removeCard,
+    removeCategory,
+    removeTag,
+    resetBillingCycleForm,
+    resetCardForm,
+    resetCategoryForm,
+    resetTagForm,
+    savingBillingCycle,
+    savingCard,
+    savingCategory,
+    savingTag,
+    tagForm,
+    submitBillingCycle,
+    submitCard,
+    submitCategory,
+    submitTag,
+} = useCatalogManagement({
+    cards,
+    categories,
+    errorMessage,
+    form,
+    loadCards,
+    loadCategories,
+    loadTags,
+    runWithLoading,
+    successMessage,
+    tags,
 });
 
 const cardsSummary = computed(() => [
@@ -146,46 +142,6 @@ const cardsSummary = computed(() => [
     { title: 'Gastos', value: `${currencySymbol}${formatAmount(expenseTotal.value)}` },
     { title: 'Saldo', value: `${currencySymbol}${formatAmount(incomeTotal.value - expenseTotal.value)}` },
 ]);
-
-const transactionFormTitle = computed(() => {
-    if (editingTransactionId.value !== null) {
-        return form.value.type === 'income' ? 'Editar ingreso' : 'Editar egreso';
-    }
-
-    if (forcedTransactionType.value === 'income') {
-        return 'Registrar ingreso';
-    }
-
-    if (forcedTransactionType.value === 'expense') {
-        return 'Registrar egreso';
-    }
-
-    return 'Nueva transacción';
-});
-
-const activePrimaryTab = computed(() => {
-    if (activeScreen.value === 'dashboard') {
-        return 'dashboard';
-    }
-
-    if (activeScreen.value === 'income-list') {
-        return 'income-list';
-    }
-
-    if (activeScreen.value === 'expense-list') {
-        return 'expense-list';
-    }
-
-    if (activeScreen.value === 'transaction-form' && forcedTransactionType.value === 'income') {
-        return 'income-list';
-    }
-
-    if (activeScreen.value === 'transaction-form' && forcedTransactionType.value === 'expense') {
-        return 'expense-list';
-    }
-
-    return '';
-});
 
 const formatDate = (value) => {
 
@@ -217,21 +173,6 @@ const formatAmount = (value) => Number(value ?? 0).toLocaleString('es-AR', {
     maximumFractionDigits: 2,
 });
 
-const openTransactionForm = (type) => {
-    resetTransactionForm();
-    editingTransactionId.value = null;
-    forcedTransactionType.value = type;
-    form.value.type = type;
-    activeScreen.value = 'transaction-form';
-};
-
-const openGenericTransactionForm = () => {
-    resetTransactionForm();
-    editingTransactionId.value = null;
-    forcedTransactionType.value = null;
-    activeScreen.value = 'transaction-form';
-};
-
 const openTransactionEdit = async (listedTransaction) => {
     const transactionId = listedTransaction.transaction_id ?? listedTransaction.id;
 
@@ -255,15 +196,6 @@ const openTransactionEdit = async (listedTransaction) => {
     }, 'No fue posible cargar la transacción.');
 };
 
-const returnToTransactionList = () => {
-    const transactionType = form.value.type;
-
-    resetTransactionForm();
-    editingTransactionId.value = null;
-    forcedTransactionType.value = null;
-    activeScreen.value = transactionType === 'income' ? 'income-list' : 'expense-list';
-};
-
 const toggleUserMenu = () => {
     userMenuOpen.value = !userMenuOpen.value;
 };
@@ -273,19 +205,9 @@ const closeUserMenu = () => {
 };
 
 const setActiveScreenFromMenu = (screen) => {
-    activeScreen.value = screen;
+    navigateToScreen(screen);
     sidebarOpen.value = false;
     closeUserMenu();
-};
-
-const applyColorMode = (isDark) => {
-    isDarkMode.value = isDark;
-    document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('spendo-color-mode', isDark ? 'dark' : 'light');
-};
-
-const toggleColorMode = () => {
-    applyColorMode(!isDarkMode.value);
 };
 
 const onDocumentPointerDown = (event) => {
@@ -298,53 +220,11 @@ const onDocumentPointerDown = (event) => {
     }
 };
 
-onMounted(() => {
-    const storedColorMode = localStorage.getItem('spendo-color-mode');
-    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    applyColorMode(storedColorMode ? storedColorMode === 'dark' : prefersDarkMode);
-    document.addEventListener('pointerdown', onDocumentPointerDown);
-});
+document.addEventListener('pointerdown', onDocumentPointerDown);
 
 onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
-
-const runWithLoading = async (handler, fallbackMessage) => {
-    loading.value = true;
-    errorMessage.value = '';
-
-    try {
-        await handler();
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? fallbackMessage;
-    } finally {
-        loading.value = false;
-    }
-};
-
-const loadCategories = async () => {
-    const response = await window.axios.get('/categories');
-    categories.value = response.data;
-};
-
-const loadTags = async () => {
-    const response = await window.axios.get('/tags');
-    tags.value = response.data;
-};
-
-const loadCards = async () => {
-    const response = await window.axios.get('/cards');
-    cards.value = response.data;
-};
-
-const ensureTransactionFormData = async () => {
-    await Promise.all([
-        categories.value.length === 0 ? loadCategories() : Promise.resolve(),
-        tags.value.length === 0 ? loadTags() : Promise.resolve(),
-        cards.value.length === 0 ? loadCards() : Promise.resolve(),
-    ]);
-};
 
 watch(
     () => activeScreen.value,
@@ -384,27 +264,6 @@ watch(
 );
 
 watch(
-    () => form.value.type,
-    (type) => {
-        if (type !== 'expense') {
-            form.value.payment_method = 'cash';
-            form.value.card_id = '';
-            form.value.installments_count = 1;
-        }
-    }
-);
-
-watch(
-    () => form.value.payment_method,
-    () => {
-        if (form.value.payment_method !== 'credit') {
-            form.value.card_id = '';
-            form.value.installments_count = 1;
-        }
-    }
-);
-
-watch(
     () => activeScreen.value,
     () => {
         successMessage.value = '';
@@ -412,99 +271,12 @@ watch(
     }
 );
 
-const resetTransactionForm = () => {
-    form.value.description = '';
-    form.value.amount = '';
-    form.value.category_id = '';
-    form.value.purchase_date = new Date().toISOString().slice(0, 10);
-    form.value.payment_method = 'cash';
-    form.value.card_id = '';
-    form.value.installments_count = 1;
-    form.value.notes = '';
-    form.value.tag_ids = [];
-};
-
-const resetCategoryForm = () => {
-    categoryForm.value.id = null;
-    categoryForm.value.name = '';
-    categoryForm.value.scope = 'both';
-};
-
-const resetTagForm = () => {
-    tagForm.value.id = null;
-    tagForm.value.name = '';
-};
-
-const resetCardForm = () => {
-    cardForm.value.id = null;
-    cardForm.value.name = '';
-    cardForm.value.last_four_digits = '';
-    cardForm.value.closing_day = '';
-    cardForm.value.due_day = '';
-    cardForm.value.is_active = true;
-};
-
-const getBillingCycleForm = (cardId) => {
-    if (!billingCycleForms.value[cardId]) {
-        billingCycleForms.value[cardId] = {
-            id: null,
-            closing_date: '',
-            due_date: '',
-        };
-    }
-
-    return billingCycleForms.value[cardId];
-};
-
-const resetBillingCycleForm = (cardId) => {
-    const cycleForm = getBillingCycleForm(cardId);
-    cycleForm.id = null;
-    cycleForm.closing_date = '';
-    cycleForm.due_date = '';
-};
-
 const toInputDateValue = (value) => {
     if (!value) {
         return '';
     }
 
     return String(value).slice(0, 10);
-};
-
-const editBillingCycle = (cardId, cycle) => {
-    const cycleForm = getBillingCycleForm(cardId);
-    cycleForm.id = cycle.id;
-    cycleForm.closing_date = toInputDateValue(cycle.closing_date);
-    cycleForm.due_date = toInputDateValue(cycle.due_date);
-};
-
-const submitBillingCycle = async (cardId) => {
-    savingBillingCycle.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        const cycleForm = getBillingCycleForm(cardId);
-        const payload = {
-            closing_date: cycleForm.closing_date,
-            due_date: cycleForm.due_date,
-        };
-
-        if (cycleForm.id === null) {
-            await window.axios.post(`/cards/${cardId}/billing-cycles`, payload);
-            successMessage.value = 'Ciclo de facturación creado correctamente.';
-        } else {
-            await window.axios.put(`/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
-            successMessage.value = 'Ciclo de facturación actualizado correctamente.';
-        }
-
-        resetBillingCycleForm(cardId);
-        await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar el ciclo de facturación.';
-    } finally {
-        savingBillingCycle.value = false;
-    }
 };
 
 const submitTransaction = async () => {
@@ -583,163 +355,6 @@ const deleteTransaction = async () => {
     }
 };
 
-const editCategory = (category) => {
-    categoryForm.value.id = category.id;
-    categoryForm.value.name = category.name;
-    categoryForm.value.scope = category.scope;
-};
-
-const submitCategory = async () => {
-    savingCategory.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        const payload = {
-            name: categoryForm.value.name,
-            slug: normalizeSlug(categoryForm.value.name),
-            scope: categoryForm.value.scope,
-        };
-
-        if (categoryForm.value.id === null) {
-            await window.axios.post('/categories', payload);
-            successMessage.value = 'Categoría creada correctamente.';
-        } else {
-            await window.axios.put(`/categories/${categoryForm.value.id}`, payload);
-            successMessage.value = 'Categoría actualizada correctamente.';
-        }
-
-        resetCategoryForm();
-        await runWithLoading(loadCategories, 'No fue posible cargar las categorías.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la categoría.';
-    } finally {
-        savingCategory.value = false;
-    }
-};
-
-const removeCategory = async (categoryId) => {
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        await window.axios.delete(`/categories/${categoryId}`);
-        successMessage.value = 'Categoría eliminada correctamente.';
-
-        if (Number(form.value.category_id) === categoryId) {
-            form.value.category_id = '';
-        }
-
-        await runWithLoading(loadCategories, 'No fue posible cargar las categorías.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar la categoría.';
-    }
-};
-
-const editTag = (tag) => {
-    tagForm.value.id = tag.id;
-    tagForm.value.name = tag.name;
-};
-
-const submitTag = async () => {
-    savingTag.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        const payload = {
-            name: tagForm.value.name,
-            slug: normalizeSlug(tagForm.value.name),
-        };
-
-        if (tagForm.value.id === null) {
-            await window.axios.post('/tags', payload);
-            successMessage.value = 'Tag creado correctamente.';
-        } else {
-            await window.axios.put(`/tags/${tagForm.value.id}`, payload);
-            successMessage.value = 'Tag actualizado correctamente.';
-        }
-
-        resetTagForm();
-        await runWithLoading(loadTags, 'No fue posible cargar los tags.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar el tag.';
-    } finally {
-        savingTag.value = false;
-    }
-};
-
-const removeTag = async (tagId) => {
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        await window.axios.delete(`/tags/${tagId}`);
-        successMessage.value = 'Tag eliminado correctamente.';
-        form.value.tag_ids = form.value.tag_ids.filter((value) => Number(value) !== tagId);
-        await runWithLoading(loadTags, 'No fue posible cargar los tags.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar el tag.';
-    }
-};
-
-const editCard = (card) => {
-    cardForm.value.id = card.id;
-    cardForm.value.name = card.name;
-    cardForm.value.last_four_digits = card.last_four_digits;
-    cardForm.value.closing_day = card.closing_day ?? '';
-    cardForm.value.due_day = card.due_day ?? '';
-    cardForm.value.is_active = !!card.is_active;
-};
-
-const submitCard = async () => {
-    savingCard.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        const payload = {
-            name: cardForm.value.name,
-            last_four_digits: cardForm.value.last_four_digits,
-            closing_day: Number(cardForm.value.closing_day),
-            due_day: Number(cardForm.value.due_day),
-            is_active: cardForm.value.is_active,
-        };
-
-        if (cardForm.value.id === null) {
-            await window.axios.post('/cards', payload);
-            successMessage.value = 'Tarjeta creada correctamente.';
-        } else {
-            await window.axios.put(`/cards/${cardForm.value.id}`, payload);
-            successMessage.value = 'Tarjeta actualizada correctamente.';
-        }
-
-        resetCardForm();
-        await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la tarjeta.';
-    } finally {
-        savingCard.value = false;
-    }
-};
-
-const removeCard = async (cardId) => {
-    errorMessage.value = '';
-    successMessage.value = '';
-
-    try {
-        await window.axios.delete(`/cards/${cardId}`);
-        successMessage.value = 'Tarjeta eliminada correctamente.';
-
-        if (Number(form.value.card_id) === cardId) {
-            form.value.card_id = '';
-        }
-
-        await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
-    } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar la tarjeta.';
-    }
-};
 </script>
 
 <template>

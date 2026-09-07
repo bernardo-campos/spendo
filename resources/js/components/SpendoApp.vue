@@ -86,6 +86,7 @@ const {
     firstInstallmentPaymentDate,
     firstInstallmentPaymentDateIsEstimated,
     isCreditPayment,
+    installmentPreview,
     PAYMENT_METHODS,
     resetTransactionForm,
     showInstallments,
@@ -379,7 +380,7 @@ const deleteTransaction = async () => {
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" />
 
-        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-date="formatDate" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
+        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currency-symbol="currencySymbol" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

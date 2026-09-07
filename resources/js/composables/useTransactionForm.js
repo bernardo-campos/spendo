@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import { calculateFirstInstallmentPaymentDate, hasRealCycleForPurchaseDate } from '../utils/cardPaymentDates';
+import { buildInstallmentPreview, calculateFirstInstallmentPaymentDate, hasRealCycleForPurchaseDate } from '../utils/cardPaymentDates';
 
 const PAYMENT_METHODS = [
     { value: 'cash', label: 'Efectivo' },
@@ -44,6 +44,19 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
         }
 
         return !hasRealCycleForPurchaseDate(form.value.purchase_date, selectedCard.value);
+    });
+
+    const installmentPreview = computed(() => {
+        if (!isCreditPayment.value) {
+            return [];
+        }
+
+        return buildInstallmentPreview(
+            form.value.amount,
+            form.value.installments_count,
+            form.value.purchase_date,
+            selectedCard.value,
+        );
     });
 
     const transactionFormTitle = computed(() => {
@@ -94,6 +107,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
         firstInstallmentPaymentDate,
         firstInstallmentPaymentDateIsEstimated,
         form,
+        installmentPreview,
         isCreditPayment,
         PAYMENT_METHODS,
         resetTransactionForm,

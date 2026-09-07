@@ -14,6 +14,20 @@ const addMonthNoOverflow = ({ year, month }) => (month === 12
     ? { year: year + 1, month: 1 }
     : { year, month: month + 1 });
 
+const addMonthsNoOverflow = (date, months) => {
+    let result = { ...date };
+
+    for (let index = 0; index < months; index++) {
+        const nextMonth = addMonthNoOverflow(result);
+        result = {
+            ...nextMonth,
+            day: Math.min(result.day, daysInMonth(nextMonth.year, nextMonth.month)),
+        };
+    }
+
+    return result;
+};
+
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
 
 export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
@@ -58,4 +72,44 @@ export const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
 
     return Array.isArray(card.billing_cycles)
         && card.billing_cycles.some((cycle) => String(cycle.closing_date) >= purchaseDateValue);
+};
+
+export const buildInstallmentPreview = (totalAmount, installmentsCount, purchaseDate, card) => {
+    const purchase = toDateParts(purchaseDate);
+    const count = Number(installmentsCount);
+    const totalCents = Math.round((Number(totalAmount) || 0) * 100);
+
+    if (purchase === null || card === null || String(totalAmount ?? '').trim() === '' || !Number.isInteger(count) || count < 2 || totalCents < 0) {
+        return [];
+    }
+
+    const firstDueDate = calculateFirstInstallmentPaymentDate(purchaseDate, card);
+    const billingCycles = Array.isArray(card.billing_cycles)
+        ? [...card.billing_cycles]
+            .filter((cycle) => String(cycle.closing_date) >= formatDateParts(purchase))
+            .sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)))
+        : [];
+    const firstDueDateParts = toDateParts(firstDueDate);
+    const baseCents = Math.floor(totalCents / count);
+    let remainingCents = totalCents;
+
+    if (firstDueDateParts === null) {
+        return [];
+    }
+
+    return Array.from({ length: count }, (_, index) => {
+        const amountCents = index === count - 1 ? remainingCents : baseCents;
+        const cycle = billingCycles[index];
+        const estimatedDate = addMonthsNoOverflow(firstDueDateParts, index);
+        const dueDate = cycle?.due_date ?? formatDateParts(estimatedDate);
+
+        remainingCents -= amountCents;
+
+        return {
+            amount: amountCents / 100,
+            due_date: dueDate,
+            due_date_is_estimated: !cycle?.due_date,
+            installment_number: index + 1,
+        };
+    });
 };

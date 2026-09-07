@@ -30,7 +30,10 @@ const props = defineProps({
     firstInstallmentPaymentDateIsEstimated: { type: Boolean, required: true },
     forcedTransactionType: { type: String, default: null },
     form: { type: Object, required: true },
+    currencySymbol: { type: String, required: true },
+    formatAmount: { type: Function, required: true },
     formatDate: { type: Function, required: true },
+    installmentPreview: { type: Array, required: true },
     isCreditPayment: { type: Boolean, required: true },
     paymentMethods: { type: Array, required: true },
     saving: { type: Boolean, required: true },
@@ -236,6 +239,19 @@ const selectFirstFilteredTag = () => {
                 <p v-else-if="isCreditPayment" class="text-xs text-slate-500 dark:text-slate-400">La cantidad de cuotas no se puede modificar después de registrar la compra.</p>
 
                 <p v-if="showInstallments" class="text-xs text-slate-500 dark:text-slate-400">La fecha de pago se calcula automáticamente según cierre/vencimiento de la tarjeta.</p>
+
+                <div v-if="installmentPreview.length > 1" class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+                    <h3 class="mb-2 text-sm font-medium">Vista previa de cuotas</h3>
+                    <ul class="divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                        <li v-for="installment in installmentPreview" :key="installment.installment_number" class="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+                            <span>Cuota {{ installment.installment_number }}</span>
+                            <span class="text-right tabular-nums">
+                                {{ formatDate(installment.due_date) }} · {{ currencySymbol }}{{ formatAmount(installment.amount) }}
+                                <small v-if="installment.due_date_is_estimated" class="block text-xs text-slate-500 dark:text-slate-400">estimada</small>
+                            </span>
+                        </li>
+                    </ul>
+                </div>
 
                 <label class="block space-y-1 text-sm">
                     <span class="font-medium">Notas</span>

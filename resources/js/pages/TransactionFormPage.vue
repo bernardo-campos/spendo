@@ -102,7 +102,7 @@ const selectFirstFilteredTag = () => {
     <section class="grid gap-6">
         <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="mb-4 flex items-center gap-2">
-                <button v-if="editing" type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al listado" title="Volver al listado" @click="emit('back')">
+                <button type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al listado" title="Volver al listado" @click="emit('back')">
                     <ArrowLeft class="size-4" />
                 </button>
                 <h2 class="text-base font-semibold">{{ title }}</h2>

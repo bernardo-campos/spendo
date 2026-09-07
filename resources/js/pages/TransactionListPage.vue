@@ -1,5 +1,5 @@
 <script setup>
-import { ChevronDown } from '@lucide/vue';
+import { ArrowLeft, ChevronDown } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -29,7 +29,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(['create', 'edit']);
+const emit = defineEmits(['back', 'create', 'edit']);
 const collapsedDates = ref(new Set());
 
 const groupedTransactions = computed(() => {
@@ -89,7 +89,12 @@ const toggleGroup = (date) => {
 
 <template>
     <section class="space-y-4">
-        <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
+        <div class="flex items-center gap-2">
+            <button type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al resumen" title="Volver al resumen" @click="emit('back')">
+                <ArrowLeft class="size-4" />
+            </button>
+            <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
+        </div>
 
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
             <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>

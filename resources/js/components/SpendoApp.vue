@@ -758,9 +758,9 @@ const removeCard = async (cardId) => {
             </div>
         </template>
 
-        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @create="openTransactionForm('income')" @edit="openTransactionEdit" />
+        <TransactionListPage v-if="activeScreen === 'income-list'" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @create="openTransactionForm('expense')" @edit="openTransactionEdit" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" />
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" />
 

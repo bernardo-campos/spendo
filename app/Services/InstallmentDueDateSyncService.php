@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Card;
 use App\Models\InstallmentPlan;
+use Carbon\CarbonImmutable;
 
 class InstallmentDueDateSyncService
 {
@@ -33,11 +34,14 @@ class InstallmentDueDateSyncService
             return;
         }
 
-        $cycles = $card->billingCycles()
-            ->whereDate('closing_date', '>=', $transaction->purchase_date->toDateString())
-            ->orderBy('closing_date')
+        $closingDay = $card->closing_day ?? 1;
+        $purchaseDate = CarbonImmutable::instance($transaction->purchase_date);
+        $statementMonth = $purchaseDate->day <= $closingDay
+            ? $purchaseDate->startOfMonth()
+            : $purchaseDate->addMonthNoOverflow()->startOfMonth();
+        $cyclesByMonth = $card->billingCycles()
             ->get()
-            ->values();
+            ->keyBy(fn ($cycle): string => $cycle->closing_date->format('Y-m'));
 
         $installments = $plan->installments()
             ->orderBy('installment_number')
@@ -49,7 +53,8 @@ class InstallmentDueDateSyncService
                 continue;
             }
 
-            $cycle = $cycles->get($index);
+            $cycleMonth = $statementMonth->addMonthsNoOverflow($index)->format('Y-m');
+            $cycle = $cyclesByMonth->get($cycleMonth);
 
             if ($cycle === null) {
                 continue;

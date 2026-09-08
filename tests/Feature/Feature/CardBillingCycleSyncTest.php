@@ -83,3 +83,42 @@ test('installments start with estimated due dates and are updated to real due da
 
     expect($transaction->payment_date->toDateString())->toBe('2026-04-17');
 });
+
+test('missing billing cycles do not shift installments to a later cycle', function () {
+    $user = User::factory()->create();
+
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 27,
+        'due_day' => 9,
+        'is_active' => true,
+    ]);
+
+    $card->billingCycles()->create([
+        'closing_date' => '2026-07-02',
+        'due_date' => '2026-07-15',
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/transactions', [
+            'type' => 'expense',
+            'description' => 'Compra histórica en cuotas',
+            'amount' => 800000,
+            'purchase_date' => '2025-11-22',
+            'payment_method' => 'credit',
+            'card_id' => $card->id,
+            'installments_count' => 3,
+            'tag_ids' => [],
+        ])
+        ->assertCreated();
+
+    $installments = Installment::query()
+        ->whereHas('installmentPlan', fn ($query) => $query->where('card_id', $card->id))
+        ->orderBy('installment_number')
+        ->get();
+
+    expect($installments->pluck('due_date')->map->toDateString()->all())
+        ->toBe(['2025-12-09', '2026-01-09', '2026-02-09']);
+});

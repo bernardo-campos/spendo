@@ -22,8 +22,14 @@ class CardPaymentDateService
             ];
         }
 
+        $closingDay = $card->closing_day ?? 1;
+        $statementMonth = $purchase->day <= $closingDay
+            ? $purchase->startOfMonth()
+            : $purchase->addMonthNoOverflow()->startOfMonth();
+
         $cycle = $card->billingCycles()
-            ->whereDate('closing_date', '>=', $purchase->toDateString())
+            ->whereYear('closing_date', $statementMonth->year)
+            ->whereMonth('closing_date', $statementMonth->month)
             ->orderBy('closing_date')
             ->first();
 
@@ -34,12 +40,7 @@ class CardPaymentDateService
             ];
         }
 
-        $closingDay = $card->closing_day ?? 1;
         $dueDay = $card->due_day ?? $closingDay;
-
-        $statementMonth = $purchase->day <= $closingDay
-            ? $purchase->startOfMonth()
-            : $purchase->addMonthNoOverflow()->startOfMonth();
 
         $dueMonth = $statementMonth->addMonthNoOverflow();
         $lastDayOfDueMonth = $dueMonth->endOfMonth()->day;

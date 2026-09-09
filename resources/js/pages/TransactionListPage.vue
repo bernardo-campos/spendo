@@ -112,7 +112,7 @@ const toggleGroup = (date) => {
             <p v-else-if="transactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ emptyMessage }}</p>
             <div v-else class="space-y-5">
                 <section v-for="group in groupedTransactions" :key="group.date">
-                    <button type="button" class="flex w-full items-baseline justify-between gap-4 pr-4 text-left sm:pr-0" :aria-expanded="isGroupExpanded(group.date)" @click="toggleGroup(group.date)">
+                    <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :aria-expanded="isGroupExpanded(group.date)" @click="toggleGroup(group.date)">
                         <span class="flex items-center gap-1 text-sm font-semibold">
                             <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.date) ? 'rotate-0' : '-rotate-90'" />
                             {{ formatGroupDate(group.date) }}

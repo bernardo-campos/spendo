@@ -1,6 +1,6 @@
 <script setup>
 import { ArrowLeft, Check, ChevronsUpDown } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import {
     TagsInput,
     TagsInputInput,
@@ -44,6 +44,36 @@ const emit = defineEmits(['back', 'delete', 'submit']);
 
 const tagSearch = ref('');
 const tagInputFocused = ref(false);
+const amountDraft = ref('');
+const amountEditorOpen = ref(false);
+const amountEditorStyle = ref({});
+const amountInputRef = ref(null);
+const amountEditorInputRef = ref(null);
+let previousBodyOverflow = '';
+let previousDocumentOverflow = '';
+
+const updateAmountEditorViewport = () => {
+    const viewport = window.visualViewport;
+
+    amountEditorStyle.value = {
+        height: `${viewport?.height ?? window.innerHeight}px`,
+        transform: `translateY(${viewport?.offsetTop ?? 0}px)`,
+    };
+};
+
+const listenToAmountEditorViewport = () => {
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateAmountEditorViewport);
+        window.visualViewport.addEventListener('scroll', updateAmountEditorViewport);
+    }
+};
+
+const stopListeningToAmountEditorViewport = () => {
+    if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateAmountEditorViewport);
+        window.visualViewport.removeEventListener('scroll', updateAmountEditorViewport);
+    }
+};
 
 const selectedTagValues = computed({
     get: () => props.form.tag_ids.map((tagId) => String(tagId)),
@@ -76,6 +106,73 @@ const selectedCard = computed({
 });
 
 const selectedTags = computed(() => props.tags.filter((tag) => selectedTagValues.value.includes(String(tag.id))));
+
+const normalizeAmount = (value) => {
+    const sanitizedValue = String(value ?? '').replace(/[^\d,.]/g, '');
+
+    if (sanitizedValue === '') {
+        return '';
+    }
+
+    const separatorIndex = Math.max(sanitizedValue.lastIndexOf(','), sanitizedValue.lastIndexOf('.'));
+
+    if (separatorIndex === -1) {
+        return sanitizedValue;
+    }
+
+    const integerPart = sanitizedValue.slice(0, separatorIndex).replace(/[.,]/g, '') || '0';
+    const decimalPart = sanitizedValue.slice(separatorIndex + 1).replace(/[.,]/g, '');
+
+    return `${integerPart}.${decimalPart}`;
+};
+
+const formattedAmountDraft = computed(() => {
+    const normalizedAmount = normalizeAmount(amountDraft.value);
+
+    return normalizedAmount === '' ? '0,00' : props.formatAmount(Number(normalizedAmount));
+});
+
+const openAmountEditor = async () => {
+    if (amountEditorOpen.value || !window.matchMedia('(max-width: 639px)').matches) {
+        return;
+    }
+
+    previousBodyOverflow = document.body.style.overflow;
+    previousDocumentOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    updateAmountEditorViewport();
+    listenToAmountEditorViewport();
+    amountDraft.value = props.form.amount === '' ? '' : String(props.form.amount).replace('.', ',');
+    amountEditorOpen.value = true;
+
+    await nextTick();
+    amountEditorInputRef.value?.focus();
+    amountEditorInputRef.value?.select();
+};
+
+const updateAmountDraft = (value) => {
+    amountDraft.value = value;
+    props.form.amount = normalizeAmount(value);
+};
+
+const closeAmountEditor = () => {
+    props.form.amount = normalizeAmount(amountDraft.value);
+    amountEditorOpen.value = false;
+    stopListeningToAmountEditorViewport();
+    document.body.style.overflow = previousBodyOverflow;
+    document.documentElement.style.overflow = previousDocumentOverflow;
+    amountInputRef.value?.blur();
+};
+
+onBeforeUnmount(() => {
+    stopListeningToAmountEditorViewport();
+
+    if (amountEditorOpen.value) {
+        document.body.style.overflow = previousBodyOverflow;
+        document.documentElement.style.overflow = previousDocumentOverflow;
+    }
+});
 
 const filteredTags = computed(() => {
     const searchTerm = tagSearch.value.trim().toLocaleLowerCase('es-AR');
@@ -119,7 +216,7 @@ const selectFirstFilteredTag = () => {
                     </label>
                     <label class="block space-y-1 text-sm">
                         <span class="font-medium">Monto</span>
-                        <input v-model="form.amount" type="number" min="0" step="0.01" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                        <input ref="amountInputRef" v-model="form.amount" type="number" min="0" step="0.01" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" @focus="openAmountEditor">
                     </label>
                 </div>
 
@@ -246,6 +343,15 @@ const selectFirstFilteredTag = () => {
                     <button v-if="editing" type="button" :disabled="saving || deleting" class="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950" @click="emit('delete')">{{ deleting ? 'Eliminando...' : 'Eliminar transacción' }}</button>
                 </div>
             </form>
+
+            <div v-if="amountEditorOpen" class="fixed inset-x-0 top-0 z-50 flex flex-col overscroll-contain overflow-hidden bg-white px-5 py-6 dark:bg-slate-950 sm:hidden" :style="amountEditorStyle" role="dialog" aria-label="Editar monto" aria-modal="true">
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Monto</span>
+                <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-6">
+                    <div class="w-full text-center text-5xl font-semibold tabular-nums text-slate-900 dark:text-slate-100" aria-live="polite">{{ formattedAmountDraft }}</div>
+                    <input ref="amountEditorInputRef" :value="amountDraft" type="text" inputmode="decimal" autocomplete="off" class="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-center text-2xl tabular-nums text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-100" aria-label="Monto" @input="updateAmountDraft($event.target.value)" @keydown.esc.prevent="closeAmountEditor" @keydown.enter.prevent="closeAmountEditor">
+                </div>
+                <button type="button" class="mt-auto w-full rounded-md bg-slate-900 px-4 py-3 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900" @click="closeAmountEditor">Listo</button>
+            </div>
         </article>
     </section>
 </template>

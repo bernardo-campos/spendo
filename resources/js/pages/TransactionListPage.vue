@@ -99,20 +99,20 @@ const toggleGroup = (date) => {
 </script>
 
 <template>
-    <section class="space-y-4">
-        <div class="flex items-center gap-2">
+    <section class="-mx-4 space-y-4 sm:mx-0">
+        <div class="flex items-center gap-2 px-4 pt-4 sm:px-0 sm:pt-0">
             <button type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al resumen" title="Volver al resumen" @click="emit('back')">
                 <ArrowLeft class="size-4" />
             </button>
             <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
         </div>
 
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-            <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="transactions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">{{ emptyMessage }}</p>
+        <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
+            <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
+            <p v-else-if="transactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ emptyMessage }}</p>
             <div v-else class="space-y-5">
                 <section v-for="group in groupedTransactions" :key="group.date">
-                    <button type="button" class="flex w-full items-baseline justify-between gap-4 text-left" :aria-expanded="isGroupExpanded(group.date)" @click="toggleGroup(group.date)">
+                    <button type="button" class="flex w-full items-baseline justify-between gap-4 pr-4 text-left sm:pr-0" :aria-expanded="isGroupExpanded(group.date)" @click="toggleGroup(group.date)">
                         <span class="flex items-center gap-1 text-sm font-semibold">
                             <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.date) ? 'rotate-0' : '-rotate-90'" />
                             {{ formatGroupDate(group.date) }}
@@ -122,7 +122,7 @@ const toggleGroup = (date) => {
 
                     <div class="grid transition-[grid-template-rows] duration-200 ease-out" :class="isGroupExpanded(group.date) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'">
                         <div class="overflow-hidden">
-                            <div class="mt-2 rounded-md border border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 dark:border-slate-800 dark:bg-slate-900" :class="isGroupExpanded(group.date) ? 'opacity-100' : 'opacity-0'">
+                            <div class="mt-0 rounded-none border-b border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 sm:mt-2 sm:rounded-md sm:border sm:border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:sm:border-slate-800" :class="isGroupExpanded(group.date) ? 'opacity-100' : 'opacity-0'">
                                 <ul class="space-y-3">
                                     <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
                                         <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
@@ -147,7 +147,7 @@ const toggleGroup = (date) => {
                 </section>
             </div>
 
-            <div class="sticky bottom-4 mt-4 flex justify-end">
+            <div class="sticky bottom-4 mt-4 flex justify-end px-4 pb-4 sm:px-0 sm:pb-0">
                 <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="emit('create')">
                     Registrar {{ title.toLowerCase().slice(0, -1) }}
                 </button>

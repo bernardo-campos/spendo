@@ -14,7 +14,9 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('/app', 'app')->name('app');
+    Route::view('/app/{screen?}', 'app')
+        ->where('screen', '.*')
+        ->name('app');
 
     Route::get('/dashboard', DashboardController::class);
     Route::apiResource('categories', CategoryController::class);

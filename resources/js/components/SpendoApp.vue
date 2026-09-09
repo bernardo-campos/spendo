@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAsyncAction } from '../composables/useAsyncAction';
 import { useCatalogs } from '../composables/useCatalogs';
 import { useCatalogManagement } from '../composables/useCatalogManagement';
@@ -201,9 +201,25 @@ const openTransactionEdit = async (listedTransaction) => {
         form.value.tag_ids = (transaction.tags ?? []).map((tag) => tag.id);
         editingTransactionId.value = transaction.id;
         forcedTransactionType.value = transaction.type;
-        activeScreen.value = 'transaction-form';
+        navigateToScreen('transaction-form');
     }, 'No fue posible cargar la transacción.');
 };
+
+onMounted(() => {
+    if (activeScreen.value !== 'transaction-form') {
+        return;
+    }
+
+    if (editingTransactionId.value !== null) {
+        void openTransactionEdit({ id: editingTransactionId.value });
+
+        return;
+    }
+
+    if (forcedTransactionType.value !== null) {
+        form.value.type = forcedTransactionType.value;
+    }
+});
 
 const toggleUserMenu = () => {
     userMenuOpen.value = !userMenuOpen.value;
@@ -329,7 +345,7 @@ const submitTransaction = async () => {
         resetTransactionForm();
         editingTransactionId.value = null;
         forcedTransactionType.value = null;
-        activeScreen.value = registeredType === 'income' ? 'income-list' : 'expense-list';
+        navigateToScreen(registeredType === 'income' ? 'income-list' : 'expense-list');
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la transacción.';
     } finally {
@@ -356,7 +372,7 @@ const deleteTransaction = async () => {
         resetTransactionForm();
         editingTransactionId.value = null;
         forcedTransactionType.value = null;
-        activeScreen.value = deletedType === 'income' ? 'income-list' : 'expense-list';
+        navigateToScreen(deletedType === 'income' ? 'income-list' : 'expense-list');
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar la transacción.';
     } finally {

@@ -5,9 +5,16 @@ export const useCatalogs = () => {
     const tags = ref([]);
     const cards = ref([]);
 
+    const categorySortKey = (category) => String(category.name ?? '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .trim();
+
+    const sortCategories = (categoryList) => [...categoryList].sort((left, right) => categorySortKey(left)
+        .localeCompare(categorySortKey(right), 'es-AR', { sensitivity: 'base' }));
+
     const loadCategories = async () => {
         const response = await window.axios.get('/categories');
-        categories.value = response.data;
+        categories.value = sortCategories(response.data);
     };
 
     const loadTags = async () => {

@@ -62,7 +62,8 @@ class TransactionController extends Controller
                     });
             })
             ->with(['category', 'card', 'tags', 'installmentPlan.installments'])
-            ->latest('purchase_date');
+            ->latest('purchase_date')
+            ->latest('created_at');
 
         if ($request->routeIs('api.v1.*')) {
             return TransactionResource::collection($transactions->paginate())->response();

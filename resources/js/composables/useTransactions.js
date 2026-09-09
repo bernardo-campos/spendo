@@ -33,6 +33,7 @@ export const useTransactions = (selectedPeriod) => {
                         installment_number: installment.installment_number,
                         tags: transaction.tags,
                         total_installments: totalInstallments,
+                        created_at: transaction.created_at,
                         type: 'expense',
                     }));
             }

@@ -36,7 +36,15 @@ const groupedTransactions = computed(() => {
     const transactionsByDate = new Map();
 
     [...props.transactions]
-        .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
+        .sort((left, right) => {
+            const purchaseDateOrder = String(right.purchase_date).localeCompare(String(left.purchase_date));
+
+            if (purchaseDateOrder !== 0) {
+                return purchaseDateOrder;
+            }
+
+            return String(right.created_at ?? '').localeCompare(String(left.created_at ?? ''));
+        })
         .forEach((transaction) => {
             const date = String(transaction.purchase_date).slice(0, 10);
             const group = transactionsByDate.get(date) ?? {

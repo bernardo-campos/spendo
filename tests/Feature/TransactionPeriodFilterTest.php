@@ -100,6 +100,37 @@ test('transactions are filtered by the requested period', function () {
         ->not->toContain($outsidePeriod->id, $otherUserTransaction->id);
 });
 
+test('transactions with the same purchase date are ordered by newest creation time', function () {
+    $user = User::factory()->create();
+
+    $olderTransaction = Transaction::query()->create([
+        'user_id' => $user->id,
+        'type' => 'expense',
+        'description' => 'Gasto anterior',
+        'amount' => 100,
+        'purchase_date' => '2026-03-15',
+        'payment_date' => '2026-03-15',
+    ]);
+    $olderTransaction->forceFill(['created_at' => '2026-03-15 08:00:00'])->saveQuietly();
+
+    $newerTransaction = Transaction::query()->create([
+        'user_id' => $user->id,
+        'type' => 'expense',
+        'description' => 'Gasto posterior',
+        'amount' => 200,
+        'purchase_date' => '2026-03-15',
+        'payment_date' => '2026-03-15',
+    ]);
+    $newerTransaction->forceFill(['created_at' => '2026-03-15 12:00:00'])->saveQuietly();
+
+    $response = $this->actingAs($user)
+        ->getJson('/transactions?period=2026-03')
+        ->assertSuccessful();
+
+    expect(collect($response->json())->pluck('id')->all())
+        ->toBe([$newerTransaction->id, $olderTransaction->id]);
+});
+
 test('transactions require a valid period', function (string $period) {
     $user = User::factory()->create();
     $url = $period === '' ? '/transactions' : '/transactions?period='.urlencode($period);

@@ -11,9 +11,7 @@ import {
 import {
     Combobox,
     ComboboxAnchor,
-    ComboboxEmpty,
     ComboboxGroup,
-    ComboboxInput,
     ComboboxItem,
     ComboboxItemIndicator,
     ComboboxList,
@@ -132,30 +130,15 @@ const selectFirstFilteredTag = () => {
 
                 <div class="space-y-1 text-sm">
                     <span class="font-medium">Categoría</span>
-                    <Combobox v-model="selectedCategory" by="id">
-                        <ComboboxAnchor as-child>
-                            <ComboboxTrigger as-child>
-                                <button type="button" class="flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left dark:border-slate-700 dark:bg-slate-950" aria-label="Seleccionar categoría">
-                                    <span class="truncate">{{ selectedCategory?.name ?? 'Sin categoría' }}</span>
-                                    <ChevronsUpDown class="ml-2 size-4 shrink-0 text-slate-500 dark:text-slate-400" />
-                                </button>
-                            </ComboboxTrigger>
-                        </ComboboxAnchor>
-                        <ComboboxList class="w-[var(--reka-combobox-trigger-width)] max-w-[calc(100vw-2rem)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" align="start">
-                            <ComboboxInput placeholder="Buscar categoría..." class="border-b border-slate-200 bg-transparent dark:border-slate-700" />
-                            <ComboboxEmpty class="px-2 py-3 text-sm text-slate-500 dark:text-slate-400">No se encontraron categorías.</ComboboxEmpty>
-                            <ComboboxGroup>
-                                <ComboboxItem :value="null">
-                                    Sin categoría
-                                    <ComboboxItemIndicator class="ml-auto"><Check class="size-4" /></ComboboxItemIndicator>
-                                </ComboboxItem>
-                                <ComboboxItem v-for="category in categoryOptions" :key="category.id" :value="category">
-                                    {{ category.name }}
-                                    <ComboboxItemIndicator class="ml-auto"><Check class="size-4" /></ComboboxItemIndicator>
-                                </ComboboxItem>
-                            </ComboboxGroup>
-                        </ComboboxList>
-                    </Combobox>
+                    <div class="flex flex-wrap gap-2" role="group" aria-label="Seleccionar categoría">
+                        <button type="button" class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="selectedCategory === null ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="selectedCategory === null" @click="selectedCategory = null">
+                            Sin categoría
+                        </button>
+                        <button v-for="category in categoryOptions" :key="category.id" type="button" class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="Number(selectedCategory?.id) === Number(category.id) ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="Number(selectedCategory?.id) === Number(category.id)" @click="selectedCategory = category">
+                            {{ category.name }}
+                        </button>
+                        <span v-if="categoryOptions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay categorías disponibles.</span>
+                    </div>
                 </div>
 
                 <label class="block space-y-1 text-sm">

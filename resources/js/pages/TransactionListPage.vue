@@ -1,6 +1,6 @@
 <script setup>
 import { ArrowLeft, ChevronDown } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     currencySymbol: {
@@ -27,10 +27,13 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    collapsedDates: {
+        type: Set,
+        required: true,
+    },
 });
 
-const emit = defineEmits(['back', 'create', 'edit']);
-const collapsedDates = ref(new Set());
+const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
 
 const groupedTransactions = computed(() => {
     const transactionsByDate = new Map();
@@ -80,10 +83,10 @@ const transactionTypeLabel = (transaction) => {
     return transaction.payment_method === 'credit' ? 'Crédito' : 'Efectivo';
 };
 
-const isGroupExpanded = (date) => !collapsedDates.value.has(date);
+const isGroupExpanded = (date) => !props.collapsedDates.has(date);
 
 const toggleGroup = (date) => {
-    const updatedCollapsedDates = new Set(collapsedDates.value);
+    const updatedCollapsedDates = new Set(props.collapsedDates);
 
     if (updatedCollapsedDates.has(date)) {
         updatedCollapsedDates.delete(date);
@@ -91,7 +94,7 @@ const toggleGroup = (date) => {
         updatedCollapsedDates.add(date);
     }
 
-    collapsedDates.value = updatedCollapsedDates;
+    emit('update:collapsed-dates', updatedCollapsedDates);
 };
 </script>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { Plus } from '@lucide/vue';
+import { ChevronRight, Plus } from '@lucide/vue';
 
 defineProps({
     cardsSummary: {
@@ -28,15 +28,18 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['create-expense']);
+const emit = defineEmits(['create-expense', 'navigate']);
 </script>
 
 <template>
     <section class="grid gap-4 md:grid-cols-3">
-        <article v-for="card in cardsSummary" :key="card.title" class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ card.title }}</h2>
-            <p class="mt-2 text-2xl font-semibold">{{ card.value }}</p>
-        </article>
+        <component :is="card.target ? 'button' : 'article'" v-for="card in cardsSummary" :key="card.title" :type="card.target ? 'button' : undefined" class="rounded-lg border border-slate-200 bg-white p-4 text-left dark:border-slate-800 dark:bg-slate-900" :class="card.target ? 'cursor-pointer transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800' : ''" @click="card.target ? emit('navigate', card.target) : undefined">
+            <h2 class="flex items-center gap-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                {{ card.title }}
+                <ChevronRight v-if="card.target" class="size-4" aria-hidden="true" />
+            </h2>
+            <p class="mt-2 text-right text-2xl font-semibold" :class="card.colorClass">{{ currencySymbol }} {{ formatAmount(card.amount) }}</p>
+        </component>
     </section>
 
     <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">

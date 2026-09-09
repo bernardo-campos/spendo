@@ -147,9 +147,15 @@ const {
 });
 
 const cardsSummary = computed(() => [
-    { title: 'Ingresos', value: `${currencySymbol}${formatAmount(incomeTotal.value)}` },
-    { title: 'Gastos', value: `${currencySymbol}${formatAmount(expenseTotal.value)}` },
-    { title: 'Saldo', value: `${currencySymbol}${formatAmount(incomeTotal.value - expenseTotal.value)}` },
+    { amount: incomeTotal.value, colorClass: 'text-emerald-600 dark:text-emerald-400', target: 'income-list', title: 'Ingresos' },
+    { amount: expenseTotal.value, colorClass: 'text-rose-400', target: 'expense-list', title: 'Gastos' },
+    {
+        amount: incomeTotal.value - expenseTotal.value,
+        colorClass: incomeTotal.value - expenseTotal.value >= 0
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : 'text-rose-400',
+        title: 'Saldo',
+    },
 ]);
 
 const formatDate = (value) => {
@@ -402,7 +408,7 @@ const deleteTransaction = async () => {
 
         <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
-        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" />
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
 
         <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currency-symbol="currencySymbol" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 

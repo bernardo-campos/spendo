@@ -11,20 +11,16 @@ defineProps({
         type: String,
         required: true,
     },
-    currencySymbol: {
-        type: String,
+    expenseTotals: {
+        type: Object,
         required: true,
     },
-    expenseTotal: {
-        type: Number,
-        required: true,
-    },
-    formatAmount: {
+    formatCurrencyAmount: {
         type: Function,
         required: true,
     },
-    incomeTotal: {
-        type: Number,
+    incomeTotals: {
+        type: Object,
         required: true,
     },
     isDarkMode: {
@@ -63,7 +59,7 @@ const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', '
 <template>
     <div class="min-h-screen bg-background text-foreground">
         <div v-if="sidebarOpen" class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" @click="emit('set-sidebar-open', false)"></div>
-        <AdminSidebar :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :currency-symbol="currencySymbol" :expense-total="expenseTotal" :format-amount="formatAmount" :income-total="incomeTotal" :open="sidebarOpen" :transactions-loading="transactionsLoading" @close="emit('set-sidebar-open', false)" @navigate="emit('navigate', $event)" />
+        <AdminSidebar :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :expense-totals="expenseTotals" :format-currency-amount="formatCurrencyAmount" :income-totals="incomeTotals" :open="sidebarOpen" :transactions-loading="transactionsLoading" @close="emit('set-sidebar-open', false)" @navigate="emit('navigate', $event)" />
 
         <div class="min-h-screen lg:pl-64">
             <AdminHeader :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @open-sidebar="emit('set-sidebar-open', true)" @toggle-color-mode="emit('toggle-color-mode')" @toggle-user-menu="emit('toggle-user-menu')" @update:selected-period="emit('update:selected-period', $event)">

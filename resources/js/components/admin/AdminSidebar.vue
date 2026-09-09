@@ -18,20 +18,16 @@ defineProps({
         type: String,
         required: true,
     },
-    currencySymbol: {
-        type: String,
+    expenseTotals: {
+        type: Object,
         required: true,
     },
-    expenseTotal: {
-        type: Number,
-        required: true,
-    },
-    formatAmount: {
+    formatCurrencyAmount: {
         type: Function,
         required: true,
     },
-    incomeTotal: {
-        type: Number,
+    incomeTotals: {
+        type: Object,
         required: true,
     },
     open: {
@@ -45,6 +41,9 @@ defineProps({
 });
 
 const emit = defineEmits(['close', 'navigate']);
+
+const visibleCurrencyTotals = (totals) => Object.entries(totals)
+    .filter(([currency, amount]) => currency !== 'USD' || Number(amount) !== 0);
 </script>
 
 <template>
@@ -67,13 +66,13 @@ const emit = defineEmits(['close', 'navigate']);
                 <WalletCards class="size-4" />
                 Ingresos
                 <span v-if="transactionsLoading" class="ml-auto text-xs italic text-muted-foreground">Cargando...</span>
-                <span v-else class="ml-auto text-xs tabular-nums">{{ currencySymbol }}{{ formatAmount(incomeTotal) }}</span>
+                <span v-else class="ml-auto flex flex-col text-right text-xs tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(incomeTotals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
             </button>
             <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activePrimaryTab === 'expense-list' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'expense-list')">
                 <ReceiptText class="size-4" />
                 Egresos
                 <span v-if="transactionsLoading" class="ml-auto text-xs italic text-muted-foreground">Cargando...</span>
-                <span v-else class="ml-auto text-xs tabular-nums">{{ currencySymbol }}{{ formatAmount(expenseTotal) }}</span>
+                <span v-else class="ml-auto flex flex-col text-right text-xs tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(expenseTotals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
             </button>
 
             <p class="px-3 pb-2 pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuración</p>

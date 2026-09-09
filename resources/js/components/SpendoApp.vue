@@ -17,8 +17,12 @@ import TransactionListPage from '../pages/TransactionListPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
 const userName = rootElement?.dataset.userName ?? 'Usuario';
-const currencySymbol = rootElement?.dataset.currencySymbol ?? '$';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+const CURRENCY_OPTIONS = [
+    { value: 'ARS', label: 'Pesos argentinos (AR$)' },
+    { value: 'USD', label: 'Dólares (USD$)' },
+];
+const CURRENCY_SYMBOLS = { ARS: 'AR$', USD: 'USD$' };
 
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
 const collapsedDatesByList = ref({
@@ -44,9 +48,9 @@ const {
 } = useCatalogs();
 const {
     dashboardRecentTransactions,
-    expenseTotal,
+    expenseTotals,
     expenseTransactions,
-    incomeTotal,
+    incomeTotals,
     incomeTransactions,
     invalidateTransactions,
     loadTransactions,
@@ -69,6 +73,7 @@ const form = ref({
     type: 'expense',
     description: '',
     amount: '',
+    currency: 'ARS',
     category_id: '',
     purchase_date: new Date().toISOString().slice(0, 10),
     payment_method: 'cash',
@@ -146,16 +151,17 @@ const {
     tags,
 });
 
+const netTotals = computed(() => Object.fromEntries(
+    Object.keys(incomeTotals.value).map((currency) => [
+        currency,
+        incomeTotals.value[currency] - expenseTotals.value[currency],
+    ]),
+));
+
 const cardsSummary = computed(() => [
-    { amount: incomeTotal.value, colorClass: 'text-emerald-600 dark:text-emerald-400', target: 'income-list', title: 'Ingresos' },
-    { amount: expenseTotal.value, colorClass: 'text-rose-400', target: 'expense-list', title: 'Gastos' },
-    {
-        amount: incomeTotal.value - expenseTotal.value,
-        colorClass: incomeTotal.value - expenseTotal.value >= 0
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : 'text-rose-400',
-        title: 'Saldo',
-    },
+    { amounts: incomeTotals.value, colorClass: 'text-emerald-600 dark:text-emerald-400', target: 'income-list', title: 'Ingresos' },
+    { amounts: expenseTotals.value, colorClass: 'text-rose-400', target: 'expense-list', title: 'Gastos' },
+    { amounts: netTotals.value, colorClass: 'text-slate-900 dark:text-slate-100', title: 'Saldo' },
 ]);
 
 const formatDate = (value) => {
@@ -198,6 +204,7 @@ const openTransactionEdit = async (listedTransaction) => {
         form.value.type = transaction.type;
         form.value.description = transaction.description;
         form.value.amount = transaction.amount;
+        form.value.currency = transaction.currency ?? 'ARS';
         form.value.category_id = transaction.category_id ?? '';
         form.value.purchase_date = toInputDateValue(transaction.purchase_date);
         form.value.payment_method = transaction.payment_method ?? 'cash';
@@ -226,6 +233,8 @@ onMounted(() => {
         form.value.type = forcedTransactionType.value;
     }
 });
+
+const formatCurrencyAmount = (currency, value) => `${CURRENCY_SYMBOLS[currency] ?? currency} ${formatAmount(value)}`;
 
 const toggleUserMenu = () => {
     userMenuOpen.value = !userMenuOpen.value;
@@ -320,6 +329,7 @@ const submitTransaction = async () => {
             type: form.value.type,
             description: form.value.description,
             amount: form.value.amount,
+            currency: form.value.currency,
             purchase_date: form.value.purchase_date,
             category_id: form.value.category_id || null,
             notes: form.value.notes || null,
@@ -389,7 +399,7 @@ const deleteTransaction = async () => {
 </script>
 
 <template>
-    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :currency-symbol="currencySymbol" :expense-total="expenseTotal" :format-amount="formatAmount" :income-total="incomeTotal" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :transactions-loading="transactionsLoading" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
+    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :expense-totals="expenseTotals" :format-currency-amount="formatCurrencyAmount" :income-totals="incomeTotals" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :transactions-loading="transactionsLoading" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
         <template #user-menu="{ open }">
             <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
                 <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
@@ -404,13 +414,13 @@ const deleteTransaction = async () => {
             </div>
         </template>
 
-        <TransactionListPage v-if="activeScreen === 'income-list'" :collapsed-dates="collapsedDatesByList.income" :currency-symbol="currencySymbol" empty-message="No hay ingresos registrados." :format-amount="formatAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('income', $event)" />
+        <TransactionListPage v-if="activeScreen === 'income-list'" :collapsed-dates="collapsedDatesByList.income" empty-message="No hay ingresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('income', $event)" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :currency-symbol="currencySymbol" empty-message="No hay egresos registrados." :format-amount="formatAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
-        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :currency-symbol="currencySymbol" :format-amount="formatAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
 
-        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currency-symbol="currencySymbol" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
+        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

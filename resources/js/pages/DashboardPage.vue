@@ -6,11 +6,7 @@ defineProps({
         type: Array,
         required: true,
     },
-    currencySymbol: {
-        type: String,
-        required: true,
-    },
-    formatAmount: {
+    formatCurrencyAmount: {
         type: Function,
         required: true,
     },
@@ -29,6 +25,9 @@ defineProps({
 });
 
 const emit = defineEmits(['create-expense', 'navigate']);
+
+const visibleCurrencyTotals = (totals) => Object.entries(totals)
+    .filter(([currency, amount]) => currency !== 'USD' || Number(amount) !== 0);
 </script>
 
 <template>
@@ -38,7 +37,9 @@ const emit = defineEmits(['create-expense', 'navigate']);
                 {{ card.title }}
                 <ChevronRight v-if="card.target" class="size-4" aria-hidden="true" />
             </h2>
-            <p class="mt-2 text-right text-2xl font-semibold" :class="card.colorClass">{{ currencySymbol }} {{ formatAmount(card.amount) }}</p>
+            <div class="mt-2 space-y-1 text-right text-2xl font-semibold" :class="card.colorClass">
+                <p v-for="[currency, amount] in visibleCurrencyTotals(card.amounts)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</p>
+            </div>
         </component>
     </section>
 
@@ -52,7 +53,7 @@ const emit = defineEmits(['create-expense', 'navigate']);
                     <p class="font-medium">{{ transaction.description }}</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ transaction.type === 'expense' ? 'Gasto' : 'Ingreso' }} · {{ formatDate(transaction.purchase_date) }}</p>
                 </div>
-                <span class="font-semibold">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
+                <span class="font-semibold">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
             </li>
         </ul>
     </section>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TransactionCurrency;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Transaction extends Model
 {
     use HasFactory;
+
+    /**
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'currency' => TransactionCurrency::ArgentinePeso->value,
+    ];
 
     /**
      * @var list<string>
@@ -23,6 +31,7 @@ class Transaction extends Model
         'type',
         'description',
         'amount',
+        'currency',
         'purchase_date',
         'payment_date',
         'notes',
@@ -35,6 +44,7 @@ class Transaction extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'currency' => TransactionCurrency::class,
             'purchase_date' => 'date',
             'payment_date' => 'date',
         ];

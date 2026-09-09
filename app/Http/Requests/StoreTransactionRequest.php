@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\PaymentMethodType;
+use App\Enums\TransactionCurrency;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -50,6 +51,7 @@ class StoreTransactionRequest extends FormRequest
             'type' => ['required', Rule::in(['income', 'expense'])],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'gt:0'],
+            'currency' => ['sometimes', Rule::enum(TransactionCurrency::class)],
             'purchase_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'installments_count' => [

@@ -11,6 +11,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
         type: 'expense',
         description: '',
         amount: '',
+        currency: 'ARS',
         category_id: '',
         purchase_date: new Date().toISOString().slice(0, 10),
         payment_method: 'cash',
@@ -78,6 +79,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
     const resetTransactionForm = () => {
         form.value.description = '';
         form.value.amount = '';
+        form.value.currency = 'ARS';
         form.value.category_id = '';
         form.value.purchase_date = new Date().toISOString().slice(0, 10);
         form.value.payment_method = 'cash';

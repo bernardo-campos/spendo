@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue';
 
+const CURRENCIES = ['ARS', 'USD'];
+
 export const useTransactions = (selectedPeriod) => {
     const transactions = ref([]);
     const transactionsLoading = ref(false);
@@ -7,6 +9,14 @@ export const useTransactions = (selectedPeriod) => {
 
     const isInSelectedPeriod = (dateValue) => String(dateValue ?? '').slice(0, 7) === selectedPeriod.value;
     const parseAmount = (value) => Number.parseFloat(value ?? 0) || 0;
+    const emptyCurrencyTotals = () => Object.fromEntries(CURRENCIES.map((currency) => [currency, 0]));
+    const totalsByCurrency = (items) => items.reduce((totals, item) => {
+        const currency = CURRENCIES.includes(item.currency) ? item.currency : 'ARS';
+
+        totals[currency] += parseAmount(item.amount);
+
+        return totals;
+    }, emptyCurrencyTotals());
 
     const incomeTransactions = computed(() => transactions.value
         .filter((transaction) => transaction.type === 'income')
@@ -30,6 +40,7 @@ export const useTransactions = (selectedPeriod) => {
                         purchase_date: installment.due_date,
                         payment_method: transaction.payment_method,
                         amount: installment.amount,
+                        currency: transaction.currency,
                         installment_number: installment.installment_number,
                         tags: transaction.tags,
                         total_installments: totalInstallments,
@@ -54,11 +65,9 @@ export const useTransactions = (selectedPeriod) => {
         .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
         .slice(0, 10));
 
-    const incomeTotal = computed(() => incomeTransactions.value
-        .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0));
+    const incomeTotals = computed(() => totalsByCurrency(incomeTransactions.value));
 
-    const expenseTotal = computed(() => expenseTransactions.value
-        .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0));
+    const expenseTotals = computed(() => totalsByCurrency(expenseTransactions.value));
 
     const loadTransactions = async () => {
         const period = selectedPeriod.value;
@@ -95,9 +104,9 @@ export const useTransactions = (selectedPeriod) => {
 
     return {
         dashboardRecentTransactions,
-        expenseTotal,
+        expenseTotals,
         expenseTransactions,
-        incomeTotal,
+        incomeTotals,
         incomeTransactions,
         invalidateTransactions,
         loadTransactions,

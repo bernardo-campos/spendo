@@ -12,7 +12,6 @@
         <div
             id="spendo-app"
             data-user-name="{{ auth()->user()->name }}"
-            data-currency-symbol="{{ config('spendo.currency_symbol', '$') }}"
         ></div>
     </body>
 </html>

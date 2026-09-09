@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TransactionCurrency;
 use App\Models\Installment;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
@@ -18,17 +19,15 @@ class DashboardController extends Controller
         $startOfMonth = now()->startOfMonth()->toDateString();
         $endOfMonth = now()->endOfMonth()->toDateString();
 
-        $income = Transaction::query()
+        $totals = Transaction::query()
             ->where('user_id', $user->id)
-            ->where('type', 'income')
             ->whereBetween('purchase_date', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
-
-        $expense = Transaction::query()
-            ->where('user_id', $user->id)
-            ->where('type', 'expense')
-            ->whereBetween('purchase_date', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
+            ->select('currency')
+            ->selectRaw("SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income")
+            ->selectRaw("SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense")
+            ->groupBy('currency')
+            ->get()
+            ->keyBy('currency');
 
         $upcomingInstallments = Installment::query()
             ->whereHas('installmentPlan', fn ($query) => $query->where('user_id', $user->id))
@@ -38,9 +37,18 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json([
-            'income_month' => number_format((float) $income, 2, '.', ''),
-            'expense_month' => number_format((float) $expense, 2, '.', ''),
-            'net_month' => number_format((float) $income - (float) $expense, 2, '.', ''),
+            'totals' => collect(TransactionCurrency::cases())
+                ->mapWithKeys(function (TransactionCurrency $currency) use ($totals): array {
+                    $currencyTotals = $totals->get($currency->value);
+                    $income = (float) ($currencyTotals?->income ?? 0);
+                    $expense = (float) ($currencyTotals?->expense ?? 0);
+
+                    return [$currency->value => [
+                        'income' => number_format($income, 2, '.', ''),
+                        'expense' => number_format($expense, 2, '.', ''),
+                        'net' => number_format($income - $expense, 2, '.', ''),
+                    ]];
+                }),
             'upcoming_installments' => $upcomingInstallments,
         ]);
     }

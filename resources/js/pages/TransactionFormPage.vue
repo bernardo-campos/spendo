@@ -23,14 +23,15 @@ const props = defineProps({
     cards: { type: Array, required: true },
     categories: { type: Array, required: true },
     categoryOptions: { type: Array, required: true },
+    currencies: { type: Array, required: true },
     deleting: { type: Boolean, required: true },
     editing: { type: Boolean, required: true },
     firstInstallmentPaymentDate: { type: String, default: null },
     firstInstallmentPaymentDateIsEstimated: { type: Boolean, required: true },
     forcedTransactionType: { type: String, default: null },
     form: { type: Object, required: true },
-    currencySymbol: { type: String, required: true },
     formatAmount: { type: Function, required: true },
+    formatCurrencyAmount: { type: Function, required: true },
     formatDate: { type: Function, required: true },
     installmentPreview: { type: Array, required: true },
     isCreditPayment: { type: Boolean, required: true },
@@ -136,6 +137,12 @@ const selectFirstFilteredTag = () => {
                     <label class="block space-y-1 text-sm">
                         <span class="font-medium">Monto</span>
                         <input ref="amountInputRef" v-model="form.amount" type="number" min="0" step="0.01" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" @focus="openAmountEditor">
+                    </label>
+                    <label class="block space-y-1 text-sm">
+                        <span class="font-medium">Moneda</span>
+                        <select v-model="form.currency" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                            <option v-for="currency in currencies" :key="currency.value" :value="currency.value">{{ currency.label }}</option>
+                        </select>
                     </label>
                 </div>
 
@@ -245,7 +252,7 @@ const selectFirstFilteredTag = () => {
                         <li v-for="installment in installmentPreview" :key="installment.installment_number" class="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
                             <span>Cuota {{ installment.installment_number }}</span>
                             <span class="text-right tabular-nums">
-                                {{ formatDate(installment.due_date) }} · {{ currencySymbol }}{{ formatAmount(installment.amount) }}
+                                {{ formatDate(installment.due_date) }} · {{ formatCurrencyAmount(form.currency, installment.amount) }}
                                 <small v-if="installment.due_date_is_estimated" class="block text-xs text-slate-500 dark:text-slate-400">estimada</small>
                             </span>
                         </li>

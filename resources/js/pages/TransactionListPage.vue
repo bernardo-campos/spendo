@@ -3,15 +3,11 @@ import { ArrowLeft, ChevronDown } from '@lucide/vue';
 import { computed } from 'vue';
 
 const props = defineProps({
-    currencySymbol: {
-        type: String,
-        required: true,
-    },
     emptyMessage: {
         type: String,
         required: true,
     },
-    formatAmount: {
+    formatCurrencyAmount: {
         type: Function,
         required: true,
     },
@@ -52,11 +48,12 @@ const groupedTransactions = computed(() => {
             const date = String(transaction.purchase_date).slice(0, 10);
             const group = transactionsByDate.get(date) ?? {
                 date,
-                total: 0,
+                totals: { ARS: 0, USD: 0 },
                 transactions: [],
             };
 
-            group.total += Number.parseFloat(transaction.amount ?? 0) || 0;
+            const currency = ['ARS', 'USD'].includes(transaction.currency) ? transaction.currency : 'ARS';
+            group.totals[currency] += Number.parseFloat(transaction.amount ?? 0) || 0;
             group.transactions.push(transaction);
             transactionsByDate.set(date, group);
         });
@@ -84,6 +81,9 @@ const transactionTypeLabel = (transaction) => {
 };
 
 const isGroupExpanded = (date) => !props.collapsedDates.has(date);
+
+const visibleCurrencyTotals = (totals) => Object.entries(totals)
+    .filter(([currency, amount]) => currency !== 'USD' || Number(amount) !== 0);
 
 const toggleGroup = (date) => {
     const updatedCollapsedDates = new Set(props.collapsedDates);
@@ -117,7 +117,7 @@ const toggleGroup = (date) => {
                             <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.date) ? 'rotate-0' : '-rotate-90'" />
                             {{ formatGroupDate(group.date) }}
                         </span>
-                        <span class="shrink-0 text-sm font-semibold tabular-nums">{{ currencySymbol }}{{ formatAmount(group.total) }}</span>
+                        <span class="flex shrink-0 flex-col text-right text-sm font-semibold tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(group.totals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
                     </button>
 
                     <div class="grid transition-[grid-template-rows] duration-200 ease-out" :class="isGroupExpanded(group.date) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'">
@@ -137,7 +137,7 @@ const toggleGroup = (date) => {
                                                     <template v-if="transaction.installment_number"> · Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
                                                 </p>
                                             </div>
-                                            <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ currencySymbol }}{{ formatAmount(transaction.amount) }}</span>
+                                            <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
                                         </button>
                                     </li>
                                 </ul>

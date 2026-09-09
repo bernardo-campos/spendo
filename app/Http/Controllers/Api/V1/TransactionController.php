@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\PaymentMethodType;
+use App\Enums\TransactionCurrency;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListTransactionRequest;
 use App\Http\Requests\StoreTransactionRequest;
@@ -118,6 +119,7 @@ class TransactionController extends Controller
                 'type' => $validated['type'],
                 'description' => $validated['description'],
                 'amount' => $validated['amount'],
+                'currency' => $validated['currency'] ?? TransactionCurrency::ArgentinePeso,
                 'purchase_date' => $validated['purchase_date'],
                 'payment_date' => $paymentDate,
                 'notes' => $validated['notes'] ?? null,

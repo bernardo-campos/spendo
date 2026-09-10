@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->name('api.v1.')->group(function () {
+Route::middleware(['auth:sanctum', 'verified'])->name('api.v1.')->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('tags', TagController::class);
     Route::apiResource('cards', CardController::class);

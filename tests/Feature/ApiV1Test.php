@@ -19,6 +19,12 @@ test('api v1 resources require Sanctum authentication', function (string $uri) {
     '/api/v1/installment-plans',
 ]);
 
+test('api v1 resources require a verified email address', function () {
+    Sanctum::actingAs(User::factory()->unverified()->create());
+
+    $this->getJson('/api/v1/transactions')->assertForbidden();
+});
+
 test('api v1 accepts a Sanctum bearer token', function () {
     $user = User::factory()->create();
     $token = $user->createToken('api-v1-test')->plainTextToken;

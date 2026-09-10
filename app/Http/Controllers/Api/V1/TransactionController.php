@@ -186,46 +186,70 @@ class TransactionController extends Controller
         abort_unless($transaction->user_id === $request->user()?->id, 404);
 
         $validated = $request->validated();
-        $effectivePaymentMethod = $validated['payment_method'] ?? $transaction->payment_method;
+        DB::transaction(function () use ($request, $transaction, $validated): void {
+            $effectivePaymentMethod = $validated['payment_method'] ?? $transaction->payment_method;
+            $installmentPlan = $transaction->installmentPlan;
+            $purchaseDateChanged = isset($validated['purchase_date'])
+                && $validated['purchase_date'] !== $transaction->purchase_date->toDateString();
+            $cardChanged = isset($validated['card_id']) && $validated['card_id'] !== $transaction->card_id;
 
-        if ($effectivePaymentMethod === PaymentMethodType::Cash->value) {
-            $validated['card_id'] = null;
-        }
-
-        if ($effectivePaymentMethod === PaymentMethodType::Credit->value) {
-            $cardId = $validated['card_id'] ?? $transaction->card_id;
-
-            abort_if($cardId === null, 422, 'Debe seleccionar una tarjeta para pago con crédito.');
-
-            $card = Card::query()
-                ->where('user_id', $request->user()->id)
-                ->where('id', $cardId)
-                ->firstOrFail();
-
-            if (isset($validated['purchase_date']) || isset($validated['payment_method']) || isset($validated['card_id'])) {
-                $resolvedPaymentDate = $this->cardPaymentDateService->resolve(
-                    $validated['purchase_date'] ?? $transaction->purchase_date->toDateString(),
-                    PaymentMethodType::Credit->value,
-                    $card,
+            if ($installmentPlan !== null && ($purchaseDateChanged || $cardChanged || $effectivePaymentMethod !== PaymentMethodType::Credit->value)) {
+                abort_if(
+                    $installmentPlan->installments()->where('status', 'paid')->exists(),
+                    422,
+                    'No se puede modificar la fecha, tarjeta ni forma de pago de una compra con cuotas pagadas.'
                 );
-
-                $validated['payment_date'] = $resolvedPaymentDate['date'];
             }
-        }
 
-        if ($effectivePaymentMethod === PaymentMethodType::Cash->value && isset($validated['purchase_date'])) {
-            $validated['payment_date'] = $validated['purchase_date'];
-        }
+            if ($installmentPlan !== null && $effectivePaymentMethod !== PaymentMethodType::Credit->value) {
+                abort(422, 'No se puede cambiar a contado una compra en cuotas.');
+            }
 
-        $transaction->update($validated);
+            if ($effectivePaymentMethod === PaymentMethodType::Cash->value) {
+                $validated['card_id'] = null;
+            }
 
-        if ($transaction->payment_method === PaymentMethodType::Credit->value && $transaction->installmentPlan !== null) {
-            $this->installmentDueDateSyncService->syncPlan($transaction->installmentPlan->fresh(['transaction', 'installments']));
-        }
+            $card = null;
 
-        if ($request->has('tag_ids')) {
-            $transaction->tags()->sync($request->validated('tag_ids', []));
-        }
+            if ($effectivePaymentMethod === PaymentMethodType::Credit->value) {
+                $cardId = $validated['card_id'] ?? $transaction->card_id;
+
+                abort_if($cardId === null, 422, 'Debe seleccionar una tarjeta para pago con crédito.');
+
+                $card = Card::query()
+                    ->where('user_id', $request->user()->id)
+                    ->where('id', $cardId)
+                    ->firstOrFail();
+
+                if (isset($validated['purchase_date']) || isset($validated['payment_method']) || isset($validated['card_id'])) {
+                    $resolvedPaymentDate = $this->cardPaymentDateService->resolve(
+                        $validated['purchase_date'] ?? $transaction->purchase_date->toDateString(),
+                        PaymentMethodType::Credit->value,
+                        $card,
+                    );
+
+                    $validated['payment_date'] = $resolvedPaymentDate['date'];
+                }
+            }
+
+            if ($effectivePaymentMethod === PaymentMethodType::Cash->value && isset($validated['purchase_date'])) {
+                $validated['payment_date'] = $validated['purchase_date'];
+            }
+
+            $transaction->update($validated);
+
+            if ($transaction->payment_method === PaymentMethodType::Credit->value && $installmentPlan !== null) {
+                if ($card !== null && $installmentPlan->card_id !== $card->id) {
+                    $installmentPlan->update(['card_id' => $card->id]);
+                }
+
+                $this->installmentDueDateSyncService->syncPlan($installmentPlan->fresh(['transaction', 'installments']));
+            }
+
+            if ($request->has('tag_ids')) {
+                $transaction->tags()->sync($request->validated('tag_ids', []));
+            }
+        });
 
         $transaction = $transaction->fresh()->load(['category', 'card', 'tags', 'installmentPlan.installments']);
 

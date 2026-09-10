@@ -55,14 +55,13 @@ class InstallmentDueDateSyncService
 
             $cycleMonth = $statementMonth->addMonthsNoOverflow($index)->format('Y-m');
             $cycle = $cyclesByMonth->get($cycleMonth);
-
-            if ($cycle === null) {
-                continue;
-            }
+            $dueMonth = $statementMonth->addMonthsNoOverflow($index + 1);
+            $dueDay = min($card->due_day ?? $closingDay, $dueMonth->endOfMonth()->day);
 
             $installment->update([
-                'due_date' => $cycle->due_date->toDateString(),
-                'due_date_is_estimated' => false,
+                'due_date' => $cycle?->due_date->toDateString()
+                    ?? $dueMonth->setDay($dueDay)->toDateString(),
+                'due_date_is_estimated' => $cycle === null,
             ]);
         }
 

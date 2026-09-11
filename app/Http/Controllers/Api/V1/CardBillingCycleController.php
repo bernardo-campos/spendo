@@ -78,9 +78,9 @@ class CardBillingCycleController extends Controller
 
         abort_if(
             isset($validated['due_date'], $validated['closing_date'])
-            && $validated['due_date'] <= $validated['closing_date'],
+            && $validated['due_date'] < $validated['closing_date'],
             422,
-            'La fecha de vencimiento debe ser posterior al cierre.'
+            'La fecha de vencimiento debe ser igual o posterior al cierre.'
         );
 
         $billingCycle->update($validated);

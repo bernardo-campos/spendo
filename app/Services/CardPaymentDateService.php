@@ -42,7 +42,9 @@ class CardPaymentDateService
 
         $dueDay = $card->due_day ?? $closingDay;
 
-        $dueMonth = $statementMonth->addMonthNoOverflow();
+        $dueMonth = $closingDay === $dueDay
+            ? $statementMonth
+            : $statementMonth->addMonthNoOverflow();
         $lastDayOfDueMonth = $dueMonth->endOfMonth()->day;
         $safeDueDay = min($dueDay, $lastDayOfDueMonth);
 

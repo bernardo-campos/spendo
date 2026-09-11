@@ -59,7 +59,7 @@ export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
     }
 
     const dueDay = Number(card.due_day) || closingDay;
-    const dueMonth = addMonthNoOverflow(statementMonth);
+    const dueMonth = closingDay === dueDay ? statementMonth : addMonthNoOverflow(statementMonth);
 
     return formatDateParts({
         year: dueMonth.year,

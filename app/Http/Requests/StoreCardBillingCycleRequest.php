@@ -33,7 +33,7 @@ class StoreCardBillingCycleRequest extends FormRequest
                     fn ($query) => $query->where('card_id', $cardId)
                 ),
             ],
-            'due_date' => ['required', 'date', 'after:closing_date'],
+            'due_date' => ['required', 'date', 'after_or_equal:closing_date'],
         ];
     }
 }

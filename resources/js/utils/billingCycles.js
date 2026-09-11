@@ -28,7 +28,7 @@ const buildEstimatedCycle = (card, referenceDate) => {
         year: referenceDate.getFullYear(),
         month: referenceDate.getMonth() + 1,
     };
-    const dueMonth = addMonth(statementMonth);
+    const dueMonth = closingDay === dueDay ? statementMonth : addMonth(statementMonth);
 
     return {
         id: `estimated-${formatDateParts({

@@ -84,6 +84,49 @@ test('installments start with estimated due dates and are updated to real due da
     expect($transaction->payment_date->toDateString())->toBe('2026-04-17');
 });
 
+test('a card with the same closing and due day behaves as a credit line', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Línea de crédito',
+        'last_four_digits' => '1234',
+        'closing_day' => 10,
+        'due_day' => 10,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/transactions', [
+            'type' => 'expense',
+            'description' => 'Compra en línea de crédito',
+            'amount' => 120000,
+            'purchase_date' => '2026-03-08',
+            'payment_method' => 'credit',
+            'card_id' => $card->id,
+            'installments_count' => 3,
+            'tag_ids' => [],
+        ])
+        ->assertCreated();
+
+    $plan = InstallmentPlan::query()->where('card_id', $card->id)->firstOrFail();
+
+    expect($plan->installments()->orderBy('installment_number')->pluck('due_date')->map->toDateString()->all())
+        ->toBe(['2026-03-10', '2026-04-10', '2026-05-10']);
+
+    $cycle = $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [
+            'closing_date' => '2026-03-10',
+            'due_date' => '2026-03-10',
+        ])
+        ->assertCreated();
+
+    $this->actingAs($user)
+        ->patchJson("/cards/{$card->id}/billing-cycles/{$cycle->json('id')}", [
+            'due_date' => '2026-03-10',
+        ])
+        ->assertSuccessful();
+});
+
 test('missing billing cycles do not shift installments to a later cycle', function () {
     $user = User::factory()->create();
 

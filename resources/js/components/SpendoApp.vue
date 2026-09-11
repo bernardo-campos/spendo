@@ -14,6 +14,7 @@ import DashboardPage from '../pages/DashboardPage.vue';
 import TagsPage from '../pages/TagsPage.vue';
 import TransactionFormPage from '../pages/TransactionFormPage.vue';
 import TransactionListPage from '../pages/TransactionListPage.vue';
+import VisualizationPage from '../pages/VisualizationPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
 const userName = rootElement?.dataset.userName ?? 'Usuario';
@@ -23,6 +24,14 @@ const CURRENCY_OPTIONS = [
     { value: 'USD', label: 'Dólares (USD$)' },
 ];
 const CURRENCY_SYMBOLS = { ARS: 'AR$', USD: 'USD$' };
+const EXPENSE_LIST_DISPLAY_DEFAULTS = {
+    show_category: true,
+    show_description: true,
+    show_cash_payment_method: false,
+    show_credit_payment_method: true,
+    show_tags: true,
+    show_notes: false,
+};
 
 const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
 const collapsedDatesByList = ref({
@@ -34,6 +43,9 @@ const userMenuOpen = ref(false);
 const sidebarOpen = ref(false);
 const savingTransaction = ref(false);
 const deletingTransaction = ref(false);
+const loadingVisualizationPreferences = ref(true);
+const savingVisualizationPreferences = ref(false);
+const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const { errorMessage, loading, runWithLoading, successMessage } = useAsyncAction();
 const { isDarkMode, toggleColorMode } = useColorMode();
 
@@ -67,6 +79,39 @@ const userInitials = computed(() => userName
 
 const updateCollapsedDates = (list, dates) => {
     collapsedDatesByList.value[list] = dates;
+};
+
+const loadVisualizationPreferences = async () => {
+    loadingVisualizationPreferences.value = true;
+
+    try {
+        const response = await window.axios.get('/visualization-preferences');
+
+        Object.assign(expenseListDisplayPreferences.value, response.data.expense_list ?? {});
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible cargar las preferencias de visualización.';
+    } finally {
+        loadingVisualizationPreferences.value = false;
+    }
+};
+
+const saveVisualizationPreferences = async () => {
+    savingVisualizationPreferences.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const response = await window.axios.put('/visualization-preferences', {
+            expense_list: expenseListDisplayPreferences.value,
+        });
+
+        Object.assign(expenseListDisplayPreferences.value, response.data.expense_list);
+        successMessage.value = 'Preferencias de visualización guardadas correctamente.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar las preferencias de visualización.';
+    } finally {
+        savingVisualizationPreferences.value = false;
+    }
 };
 
 const form = ref({
@@ -219,6 +264,8 @@ const openTransactionEdit = async (listedTransaction) => {
 };
 
 onMounted(() => {
+    void loadVisualizationPreferences();
+
     if (activeScreen.value !== 'transaction-form') {
         return;
     }
@@ -416,7 +463,7 @@ const deleteTransaction = async () => {
 
         <TransactionListPage v-if="activeScreen === 'income-list'" :collapsed-dates="collapsedDatesByList.income" empty-message="No hay ingresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('income', $event)" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :display-preferences="expenseListDisplayPreferences" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
 
@@ -427,6 +474,8 @@ const deleteTransaction = async () => {
         <CategoriesPage v-if="activeScreen === 'categories'" :categories="categories" :form="categoryForm" :saving="savingCategory" :scope-label="categoryScopeLabel" @edit="editCategory" @remove="removeCategory" @reset="resetCategoryForm" @submit="submitCategory" />
 
         <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
+
+        <VisualizationPage v-if="activeScreen === 'visualization'" :loading="loadingVisualizationPreferences" :preferences="expenseListDisplayPreferences" :saving="savingVisualizationPreferences" @submit="saveVisualizationPreferences" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

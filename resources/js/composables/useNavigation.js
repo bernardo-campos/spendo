@@ -8,6 +8,7 @@ export const useNavigation = ({ form }) => {
         categories: '/app/categories',
         tags: '/app/tags',
         cards: '/app/cards',
+        visualization: '/app/visualization',
     };
 
     const getLocationState = () => {

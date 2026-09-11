@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\InstallmentPlanController;
 use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
+use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->parameters(['billing-cycles' => 'billingCycle']);
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
+    Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);
+    Route::put('visualization-preferences', [VisualizationPreferenceController::class, 'update']);
 });

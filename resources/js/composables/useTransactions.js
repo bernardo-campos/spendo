@@ -37,6 +37,7 @@ export const useTransactions = (selectedPeriod) => {
                         transaction_id: transaction.id,
                         category: transaction.category,
                         description: transaction.description,
+                        notes: transaction.notes,
                         purchase_date: installment.due_date,
                         payment_method: transaction.payment_method,
                         amount: installment.amount,

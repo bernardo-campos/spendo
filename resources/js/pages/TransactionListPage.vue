@@ -27,6 +27,17 @@ const props = defineProps({
         type: Set,
         required: true,
     },
+    displayPreferences: {
+        type: Object,
+        default: () => ({
+            show_category: true,
+            show_description: true,
+            show_cash_payment_method: false,
+            show_credit_payment_method: true,
+            show_tags: true,
+            show_notes: false,
+        }),
+    },
 });
 
 const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
@@ -77,8 +88,14 @@ const transactionTypeLabel = (transaction) => {
         return 'Ingreso';
     }
 
-    return transaction.payment_method === 'credit' ? 'Crédito' : 'Efectivo';
+    if (transaction.payment_method === 'credit') {
+        return props.displayPreferences.show_credit_payment_method ? 'Crédito' : null;
+    }
+
+    return props.displayPreferences.show_cash_payment_method ? 'Efectivo' : null;
 };
+
+const shouldShowExpenseField = (transaction, preference) => transaction.type !== 'expense' || props.displayPreferences[preference];
 
 const isGroupExpanded = (date) => !props.collapsedDates.has(date);
 
@@ -127,14 +144,15 @@ const toggleGroup = (date) => {
                                     <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
                                         <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
                                             <div class="min-w-0">
-                                                <p class="truncate font-semibold">
+                                                <p v-if="shouldShowExpenseField(transaction, 'show_category')" class="truncate font-semibold">
                                                     {{ transaction.category?.name ?? 'Sin categoría' }}
-                                                    <span v-if="tagNames(transaction)" class="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</span>
                                                 </p>
-                                                <p class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
-                                                <p class="text-xs text-slate-500 dark:text-slate-400">
-                                                    {{ transactionTypeLabel(transaction) }}
-                                                    <template v-if="transaction.installment_number"> · Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
+                                                <p v-if="shouldShowExpenseField(transaction, 'show_tags') && tagNames(transaction)" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</p>
+                                                <p v-if="shouldShowExpenseField(transaction, 'show_description')" class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
+                                                <p v-if="shouldShowExpenseField(transaction, 'show_notes') && transaction.notes" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.notes }}</p>
+                                                <p v-if="transactionTypeLabel(transaction) || transaction.installment_number" class="text-xs text-slate-500 dark:text-slate-400">
+                                                    <template v-if="transactionTypeLabel(transaction)">{{ transactionTypeLabel(transaction) }}</template>
+                                                    <template v-if="transaction.installment_number"><span v-if="transactionTypeLabel(transaction)"> · </span>Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
                                                 </p>
                                             </div>
                                             <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>

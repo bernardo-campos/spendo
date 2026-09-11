@@ -16,6 +16,18 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * @var array<string, bool>
+     */
+    public const EXPENSE_LIST_DISPLAY_DEFAULTS = [
+        'show_category' => true,
+        'show_description' => true,
+        'show_cash_payment_method' => false,
+        'show_credit_payment_method' => true,
+        'show_tags' => true,
+        'show_notes' => false,
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -24,6 +36,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
+        'expense_list_display_preferences',
     ];
 
     /**
@@ -45,7 +58,19 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'expense_list_display_preferences' => 'array',
             'password' => 'hashed',
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    public function expenseListDisplayPreferences(): array
+    {
+        return [
+            ...self::EXPENSE_LIST_DISPLAY_DEFAULTS,
+            ...($this->expense_list_display_preferences ?? []),
         ];
     }
 

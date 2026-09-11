@@ -16,6 +16,7 @@ test('authenticated app screen routes serve the application shell', function (st
     '/app/categories',
     '/app/tags',
     '/app/cards',
+    '/app/visualization',
     '/app/transactions/create?type=expense',
     '/app/transactions/123/edit?type=expense',
 ]);

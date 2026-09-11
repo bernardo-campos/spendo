@@ -4,6 +4,7 @@ import {
     CreditCard,
     FolderTree,
     ReceiptText,
+    SlidersHorizontal,
     Tags,
     WalletCards,
     X,
@@ -87,6 +88,10 @@ const visibleCurrencyTotals = (totals) => Object.entries(totals)
             <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'tags' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'tags')">
                 <Tags class="size-4" />
                 Etiquetas
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'visualization' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'visualization')">
+                <SlidersHorizontal class="size-4" />
+                Visualización
             </button>
         </nav>
 

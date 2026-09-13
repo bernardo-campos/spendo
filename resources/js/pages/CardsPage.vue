@@ -21,7 +21,7 @@ defineProps({
     savingCard: { type: Boolean, required: true },
 });
 
-const emit = defineEmits(['edit-billing-cycle', 'edit-card', 'remove-card', 'reset-billing-cycle', 'reset-card', 'submit-billing-cycle', 'submit-card']);
+const emit = defineEmits(['edit-billing-cycle', 'edit-card', 'remove-billing-cycle', 'remove-card', 'reset-billing-cycle', 'reset-card', 'submit-billing-cycle', 'submit-card']);
 const showCardForm = ref(false);
 const cyclesDialogOpen = ref(false);
 const selectedCardForCycles = ref(null);
@@ -81,7 +81,7 @@ const closeCardForm = () => {
                     <button v-if="billingCyclesForCard(card).length > billingCyclesAroundToday(card).length" type="button" class="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100" @click="openAllCycles(card)">Ver todos</button>
                 </div>
                 <p v-if="billingCyclesAroundToday(card).length === 0" class="mb-2 text-xs text-slate-500 dark:text-slate-400">No fue posible calcular ciclos para esta tarjeta.</p>
-                <ul v-else class="mb-3 space-y-1"><li v-for="entry in billingCyclesAroundToday(card)" :key="entry.cycle.id" class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"><span><span class="mr-1 text-slate-500 dark:text-slate-400">{{ entry.label }}:</span>Cierre {{ formatDate(entry.cycle.closing_date) }} · Vence {{ formatDate(entry.cycle.due_date) }} <span v-if="entry.cycle.is_estimated" class="text-slate-500 dark:text-slate-400">(estimado)</span></span><button v-if="!entry.cycle.is_estimated" type="button" class="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="emit('edit-billing-cycle', card.id, entry.cycle)">Editar ciclo</button></li></ul>
+                <ul v-else class="mb-3 space-y-1"><li v-for="entry in billingCyclesAroundToday(card)" :key="entry.cycle.id" class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"><span><span class="mr-1 text-slate-500 dark:text-slate-400">{{ entry.label }}:</span>Cierre {{ formatDate(entry.cycle.closing_date) }} · Vence {{ formatDate(entry.cycle.due_date) }} <span v-if="entry.cycle.is_estimated" class="text-slate-500 dark:text-slate-400">(estimado)</span></span><span v-if="!entry.cycle.is_estimated" class="flex shrink-0 gap-1"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="emit('edit-billing-cycle', card.id, entry.cycle)">Editar ciclo</button><button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="emit('remove-billing-cycle', card.id, entry.cycle.id)">Eliminar</button></span></li></ul>
                 <form class="grid gap-2 sm:grid-cols-3" @submit.prevent="emit('submit-billing-cycle', card.id)">
                     <input v-model="getBillingCycleForm(card.id).closing_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
                     <input v-model="getBillingCycleForm(card.id).due_date" type="date" required class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
@@ -99,7 +99,7 @@ const closeCardForm = () => {
                 <ul class="space-y-2">
                     <li v-for="cycle in selectedCardForCycles ? billingCyclesForCard(selectedCardForCycles) : []" :key="cycle.id" class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
                         <span>Cierre {{ formatDate(cycle.closing_date) }} · Vence {{ formatDate(cycle.due_date) }} <span v-if="cycle.is_estimated" class="text-xs text-slate-500 dark:text-slate-400">(estimado)</span></span>
-                        <button v-if="!cycle.is_estimated" type="button" class="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="emit('edit-billing-cycle', selectedCardForCycles.id, cycle); cyclesDialogOpen = false">Editar ciclo</button>
+                        <span v-if="!cycle.is_estimated" class="flex shrink-0 gap-1"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="emit('edit-billing-cycle', selectedCardForCycles.id, cycle); cyclesDialogOpen = false">Editar ciclo</button><button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="emit('remove-billing-cycle', selectedCardForCycles.id, cycle.id)">Eliminar</button></span>
                     </li>
                 </ul>
                 <DialogFooter>

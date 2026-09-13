@@ -14,7 +14,7 @@ Route::get('/', function () {
     return auth()->check() ? redirect()->route('app') : redirect()->route('login');
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::view('/app/{screen?}', 'app')
         ->where('screen', '.*')
         ->name('app');

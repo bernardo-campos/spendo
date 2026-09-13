@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue';
+import { offlineClient } from '../services/offlineClient';
 
 const CURRENCIES = ['ARS', 'USD'];
 
@@ -82,7 +83,7 @@ export const useTransactions = (selectedPeriod) => {
         transactionsLoading.value = true;
 
         try {
-            const response = await window.axios.get('/transactions', {
+            const response = await offlineClient.get('/transactions', {
                 params: { period },
             });
 

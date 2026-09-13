@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { offlineClient } from '../services/offlineClient';
 
 export const useCatalogs = () => {
     const categories = ref([]);
@@ -13,17 +14,17 @@ export const useCatalogs = () => {
         .localeCompare(categorySortKey(right), 'es-AR', { sensitivity: 'base' }));
 
     const loadCategories = async () => {
-        const response = await window.axios.get('/categories');
+        const response = await offlineClient.get('/categories');
         categories.value = sortCategories(response.data);
     };
 
     const loadTags = async () => {
-        const response = await window.axios.get('/tags');
+        const response = await offlineClient.get('/tags');
         tags.value = response.data;
     };
 
     const loadCards = async () => {
-        const response = await window.axios.get('/cards');
+        const response = await offlineClient.get('/cards');
         cards.value = response.data;
     };
 

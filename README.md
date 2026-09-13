@@ -25,6 +25,8 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
   - estado activo.
 - Gestión de categorías (income / expense / both).
 - Gestión de tags.
+- Aplicación instalable (PWA) con operación offline luego de una primera visita
+  autenticada con conexión.
 
 ### Flujo UX actual
 - Sidebar responsive para `Resumen`, `Ingresos`, `Egresos`, `Tarjetas`, `Categorías` y `Etiquetas`.
@@ -36,6 +38,27 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
   dashboard y a los listados de ingresos y egresos.
 - Las transacciones se consultan por período (`/transactions?period=YYYY-MM`)
   para no cargar movimientos de otros meses.
+
+### Funcionamiento offline y sincronización
+
+- La aplicación puede instalarse desde Chrome/Android y abrirse sin conexión
+  después de haber cargado `/app` al menos una vez con internet.
+- El shell de la aplicación y sus assets se guardan mediante un service worker;
+  los datos de negocio se almacenan por usuario en IndexedDB, no en la caché
+  HTTP.
+- Se conservan los catálogos, preferencias y los períodos de transacciones que
+  cada usuario ya descargó. Una pantalla o período nunca visitado no puede
+  mostrarse sin conexión.
+- Crear, editar o eliminar transacciones, categorías, tags, tarjetas y ciclos
+  de facturación actualiza primero la copia local y se guarda en una cola
+  duradera. Al recuperar conexión, la aplicación sincroniza automáticamente en
+  orden y muestra su estado en la cabecera.
+- Las solicitudes sincronizadas usan `Idempotency-Key`: un reintento no duplica
+  una operación si la respuesta anterior se perdió.
+- El primer login requiere conexión. Al cerrar sesión se eliminan los datos
+  offline, las operaciones pendientes y la caché privada de ese usuario.
+- Si el navegador suspende la aplicación, la cola se reanuda al abrirla o al
+  recuperar la conectividad; no se garantiza sincronización en segundo plano.
 
 ### Reglas de negocio implementadas
 - Formas de pago para egresos: `cash` y `credit`.
@@ -173,6 +196,9 @@ Turnstile en `.env`, luego ejecutar:
 php artisan migrate
 ```
 
+La migración incluye la tabla de claves de idempotencia usada por la
+sincronización offline.
+
 ### 4) Desarrollo
 Ejecutar backend + cola + vite:
 ```bash
@@ -185,6 +211,10 @@ php artisan serve
 npm run dev
 ```
 
+`npm run build` únicamente genera los assets de producción; para usar la app
+localmente también debe mantenerse activo `php artisan serve` (por ejemplo en
+`http://127.0.0.1:8000`).
+
 ### 5) Build de frontend
 ```bash
 npm run build
@@ -195,6 +225,8 @@ npm run build
 - `composer run test`: limpia config y ejecuta tests.
 - `php artisan test --compact`: tests compactos.
 - `vendor/bin/pint --dirty`: formateo de archivos modificados.
+- `php artisan test --compact tests/Feature/OfflineIdempotencyTest.php`:
+  pruebas de reintentos idempotentes para la sincronización offline.
 
 ## API (resumen)
 Rutas bajo middleware `auth` y prefijo `/api`:
@@ -211,7 +243,12 @@ Rutas bajo middleware `auth` y prefijo `/api`:
   email, login, sesión persistente, logout, recuperación/restablecimiento y
   confirmación de contraseña.
 - Incluye pruebas para restricción de eliminación de tarjetas asociadas a transacciones.
+- Incluye pruebas de idempotencia para altas, eliminaciones, reutilización de
+  claves y aislamiento por usuario.
 
 ## Notas
 - Si un cambio frontend no se refleja, ejecutar `npm run dev` o `npm run build`.
+- Después de una actualización del service worker, abrir o recargar `/app` con
+  conexión una vez para que Chrome instale la nueva versión antes de probar el
+  modo sin conexión.
 - El README describe el estado funcional actual del proyecto según la implementación vigente.

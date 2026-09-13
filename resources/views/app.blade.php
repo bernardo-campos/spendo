@@ -11,6 +11,7 @@
     <body>
         <div
             id="spendo-app"
+            data-user-id="{{ auth()->id() }}"
             data-user-name="{{ auth()->user()->name }}"
         ></div>
     </body>

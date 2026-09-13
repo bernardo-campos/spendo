@@ -7,6 +7,7 @@ import { useColorMode } from '../composables/useColorMode';
 import { useNavigation } from '../composables/useNavigation';
 import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
+import { offlineClient } from '../services/offlineClient';
 import AdminLayout from './admin/AdminLayout.vue';
 import CardsPage from '../pages/CardsPage.vue';
 import CategoriesPage from '../pages/CategoriesPage.vue';
@@ -46,6 +47,7 @@ const deletingTransaction = ref(false);
 const loadingVisualizationPreferences = ref(true);
 const savingVisualizationPreferences = ref(false);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
+const offlineSyncState = offlineClient.syncState;
 const { errorMessage, loading, runWithLoading, successMessage } = useAsyncAction();
 const { isDarkMode, toggleColorMode } = useColorMode();
 
@@ -85,7 +87,7 @@ const loadVisualizationPreferences = async () => {
     loadingVisualizationPreferences.value = true;
 
     try {
-        const response = await window.axios.get('/visualization-preferences');
+        const response = await offlineClient.get('/visualization-preferences');
 
         Object.assign(expenseListDisplayPreferences.value, response.data.expense_list ?? {});
     } catch (error) {
@@ -101,7 +103,7 @@ const saveVisualizationPreferences = async () => {
     successMessage.value = '';
 
     try {
-        const response = await window.axios.put('/visualization-preferences', {
+        const response = await offlineClient.mutate('put', '/visualization-preferences', {
             expense_list: expenseListDisplayPreferences.value,
         });
 
@@ -168,6 +170,7 @@ const {
     editTag,
     getBillingCycleForm,
     removeCard,
+    removeBillingCycle,
     removeCategory,
     removeTag,
     resetBillingCycleForm,
@@ -243,7 +246,7 @@ const openTransactionEdit = async (listedTransaction) => {
     const transactionId = listedTransaction.transaction_id ?? listedTransaction.id;
 
     await runWithLoading(async () => {
-        const response = await window.axios.get(`/transactions/${transactionId}`);
+        const response = await offlineClient.get(`/transactions/${transactionId}`);
         const transaction = response.data;
 
         form.value.type = transaction.type;
@@ -295,6 +298,15 @@ const setActiveScreenFromMenu = (screen) => {
     navigateToScreen(screen);
     sidebarOpen.value = false;
     closeUserMenu();
+};
+
+const retryOfflineSync = () => {
+    void offlineClient.retry();
+};
+
+const clearOfflineData = () => {
+    void offlineClient.clear();
+    navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_PRIVATE_OFFLINE_DATA' });
 };
 
 const onDocumentPointerDown = (event) => {
@@ -394,9 +406,9 @@ const submitTransaction = async () => {
 
         if (isEditingTransaction) {
             delete payload.installments_count;
-            await window.axios.put(`/transactions/${editingTransactionId.value}`, payload);
+            await offlineClient.mutate('put', `/transactions/${editingTransactionId.value}`, payload);
         } else {
-            await window.axios.post('/transactions', payload);
+            await offlineClient.mutate('post', '/transactions', payload);
         }
 
         const registeredType = form.value.type;
@@ -410,7 +422,7 @@ const submitTransaction = async () => {
         forcedTransactionType.value = null;
         navigateToScreen(registeredType === 'income' ? 'income-list' : 'expense-list');
     } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la transacción.';
+        errorMessage.value = error?.response?.data?.message ?? error?.message ?? 'No fue posible guardar la transacción.';
     } finally {
         savingTransaction.value = false;
     }
@@ -428,7 +440,7 @@ const deleteTransaction = async () => {
     try {
         const deletedType = form.value.type;
 
-        await window.axios.delete(`/transactions/${editingTransactionId.value}`);
+        await offlineClient.mutate('delete', `/transactions/${editingTransactionId.value}`);
 
         successMessage.value = 'Transacción eliminada correctamente.';
         invalidateTransactions();
@@ -446,7 +458,7 @@ const deleteTransaction = async () => {
 </script>
 
 <template>
-    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :expense-totals="expenseTotals" :format-currency-amount="formatCurrencyAmount" :income-totals="incomeTotals" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :transactions-loading="transactionsLoading" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
+    <AdminLayout :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :expense-totals="expenseTotals" :format-currency-amount="formatCurrencyAmount" :income-totals="incomeTotals" :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sidebar-open="sidebarOpen" :sync-state="offlineSyncState" :transactions-loading="transactionsLoading" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @navigate="setActiveScreenFromMenu" @retry-sync="retryOfflineSync" @set-sidebar-open="sidebarOpen = $event" @toggle-color-mode="toggleColorMode" @toggle-user-menu="toggleUserMenu" @update:selected-period="selectedPeriod = $event">
         <template #user-menu="{ open }">
             <div v-if="open" ref="userMenuRef" class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
                 <p class="px-3 py-2 text-xs text-muted-foreground">Sesión activa</p>
@@ -454,7 +466,7 @@ const deleteTransaction = async () => {
                 <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent sm:hidden" @click="toggleColorMode">
                     {{ isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro' }}
                 </button>
-                <form method="POST" action="/logout" class="w-full">
+                <form method="POST" action="/logout" class="w-full" @submit="clearOfflineData">
                     <input type="hidden" name="_token" :value="csrfToken">
                     <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>
                 </form>
@@ -469,7 +481,7 @@ const deleteTransaction = async () => {
 
         <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
-        <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
+        <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 
         <CategoriesPage v-if="activeScreen === 'categories'" :categories="categories" :form="categoryForm" :saving="savingCategory" :scope-label="categoryScopeLabel" @edit="editCategory" @remove="removeCategory" @reset="resetCategoryForm" @submit="submitCategory" />
 

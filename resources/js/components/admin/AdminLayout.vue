@@ -31,6 +31,10 @@ defineProps({
         type: String,
         required: true,
     },
+    syncState: {
+        type: Object,
+        required: true,
+    },
     sidebarOpen: {
         type: Boolean,
         required: true,
@@ -53,7 +57,7 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
+const emit = defineEmits(['navigate', 'retry-sync', 'set-sidebar-open', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
 </script>
 
 <template>
@@ -62,7 +66,7 @@ const emit = defineEmits(['navigate', 'set-sidebar-open', 'toggle-color-mode', '
         <AdminSidebar :active-primary-tab="activePrimaryTab" :active-screen="activeScreen" :expense-totals="expenseTotals" :format-currency-amount="formatCurrencyAmount" :income-totals="incomeTotals" :open="sidebarOpen" :transactions-loading="transactionsLoading" @close="emit('set-sidebar-open', false)" @navigate="emit('navigate', $event)" />
 
         <div class="min-h-screen lg:pl-64">
-            <AdminHeader :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @open-sidebar="emit('set-sidebar-open', true)" @toggle-color-mode="emit('toggle-color-mode')" @toggle-user-menu="emit('toggle-user-menu')" @update:selected-period="emit('update:selected-period', $event)">
+            <AdminHeader :is-dark-mode="isDarkMode" :selected-period="selectedPeriod" :sync-state="syncState" :user-initials="userInitials" :user-menu-open="userMenuOpen" :user-name="userName" @open-sidebar="emit('set-sidebar-open', true)" @retry-sync="emit('retry-sync')" @toggle-color-mode="emit('toggle-color-mode')" @toggle-user-menu="emit('toggle-user-menu')" @update:selected-period="emit('update:selected-period', $event)">
                 <template #user-menu="{ open }">
                     <slot name="user-menu" :open="open" />
                 </template>

@@ -10,6 +10,10 @@ defineProps({
         type: String,
         required: true,
     },
+    syncState: {
+        type: Object,
+        required: true,
+    },
     userInitials: {
         type: String,
         required: true,
@@ -24,7 +28,27 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
+const emit = defineEmits(['open-sidebar', 'retry-sync', 'toggle-color-mode', 'toggle-user-menu', 'update:selected-period']);
+
+const syncLabel = (state) => {
+    if (state.status === 'offline') {
+        return 'Sin conexión';
+    }
+
+    if (state.status === 'syncing') {
+        return 'Sincronizando';
+    }
+
+    if (state.failed > 0) {
+        return 'Acción requerida';
+    }
+
+    if (state.pending > 0) {
+        return `${state.pending} pendientes`;
+    }
+
+    return 'Sincronizado';
+};
 </script>
 
 <template>
@@ -38,6 +62,9 @@ const emit = defineEmits(['open-sidebar', 'toggle-color-mode', 'toggle-user-menu
             <input id="navbar-period" :value="selectedPeriod" type="month" class="w-full min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="emit('update:selected-period', $event.target.value)">
         </label>
         <div class="ml-auto flex items-center gap-3">
+            <button type="button" class="hidden rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground sm:block" :title="syncState.failed > 0 ? syncState.failedMessages.join(' · ') : 'Actualizar sincronización'" @click="emit('retry-sync')">
+                {{ syncLabel(syncState) }}
+            </button>
             <button type="button" class="hidden rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground sm:block" :aria-label="isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro'" @click="emit('toggle-color-mode')">
                 <Sun v-if="isDarkMode" class="size-5" />
                 <Moon v-else class="size-5" />

@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { offlineClient } from '../services/offlineClient';
 
 const CATEGORY_SCOPE_LABELS = {
     both: 'Ambos',
@@ -82,10 +83,10 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
             const payload = { name: categoryForm.value.name, slug: normalizeSlug(categoryForm.value.name), scope: categoryForm.value.scope };
 
             if (categoryForm.value.id === null) {
-                await window.axios.post('/categories', payload);
+                await offlineClient.mutate('post', '/categories', payload);
                 successMessage.value = 'Categoría creada correctamente.';
             } else {
-                await window.axios.put(`/categories/${categoryForm.value.id}`, payload);
+                await offlineClient.mutate('put', `/categories/${categoryForm.value.id}`, payload);
                 successMessage.value = 'Categoría actualizada correctamente.';
             }
 
@@ -103,7 +104,7 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         successMessage.value = '';
 
         try {
-            await window.axios.delete(`/categories/${categoryId}`);
+            await offlineClient.mutate('delete', `/categories/${categoryId}`);
             successMessage.value = 'Categoría eliminada correctamente.';
 
             if (Number(form.value.category_id) === categoryId) {
@@ -129,10 +130,10 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
             const payload = { name: tagForm.value.name, slug: normalizeSlug(tagForm.value.name) };
 
             if (tagForm.value.id === null) {
-                await window.axios.post('/tags', payload);
+                await offlineClient.mutate('post', '/tags', payload);
                 successMessage.value = 'Tag creado correctamente.';
             } else {
-                await window.axios.put(`/tags/${tagForm.value.id}`, payload);
+                await offlineClient.mutate('put', `/tags/${tagForm.value.id}`, payload);
                 successMessage.value = 'Tag actualizado correctamente.';
             }
 
@@ -150,7 +151,7 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         successMessage.value = '';
 
         try {
-            await window.axios.delete(`/tags/${tagId}`);
+            await offlineClient.mutate('delete', `/tags/${tagId}`);
             successMessage.value = 'Tag eliminado correctamente.';
             form.value.tag_ids = form.value.tag_ids.filter((value) => Number(value) !== tagId);
             await runWithLoading(loadTags, 'No fue posible cargar los tags.');
@@ -185,10 +186,10 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
             };
 
             if (cardForm.value.id === null) {
-                await window.axios.post('/cards', payload);
+                await offlineClient.mutate('post', '/cards', payload);
                 successMessage.value = 'Tarjeta creada correctamente.';
             } else {
-                await window.axios.put(`/cards/${cardForm.value.id}`, payload);
+                await offlineClient.mutate('put', `/cards/${cardForm.value.id}`, payload);
                 successMessage.value = 'Tarjeta actualizada correctamente.';
             }
 
@@ -206,7 +207,7 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         successMessage.value = '';
 
         try {
-            await window.axios.delete(`/cards/${cardId}`);
+            await offlineClient.mutate('delete', `/cards/${cardId}`);
             successMessage.value = 'Tarjeta eliminada correctamente.';
 
             if (Number(form.value.card_id) === cardId) {
@@ -226,6 +227,19 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         cycleForm.due_date = toInputDateValue(cycle.due_date);
     };
 
+    const removeBillingCycle = async (cardId, cycleId) => {
+        errorMessage.value = '';
+        successMessage.value = '';
+
+        try {
+            await offlineClient.mutate('delete', `/cards/${cardId}/billing-cycles/${cycleId}`);
+            successMessage.value = 'Ciclo de facturación eliminado correctamente.';
+            await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
+        } catch (error) {
+            errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar el ciclo de facturación.';
+        }
+    };
+
     const submitBillingCycle = async (cardId) => {
         savingBillingCycle.value = true;
         errorMessage.value = '';
@@ -236,10 +250,10 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
             const payload = { closing_date: cycleForm.closing_date, due_date: cycleForm.due_date };
 
             if (cycleForm.id === null) {
-                await window.axios.post(`/cards/${cardId}/billing-cycles`, payload);
+                await offlineClient.mutate('post', `/cards/${cardId}/billing-cycles`, payload);
                 successMessage.value = 'Ciclo de facturación creado correctamente.';
             } else {
-                await window.axios.put(`/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
+                await offlineClient.mutate('put', `/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
                 successMessage.value = 'Ciclo de facturación actualizado correctamente.';
             }
 
@@ -263,6 +277,7 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         editTag,
         getBillingCycleForm,
         removeCard,
+        removeBillingCycle,
         removeCategory,
         removeTag,
         resetBillingCycleForm,

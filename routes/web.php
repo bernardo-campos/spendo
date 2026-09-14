@@ -14,6 +14,10 @@ Route::get('/', function () {
     return auth()->check() ? redirect()->route('app') : redirect()->route('login');
 });
 
+Route::get('/health', function () {
+    return response()->json(['status' => 'up']);
+})->name('health');
+
 Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::view('/app/{screen?}', 'app')
         ->where('screen', '.*')

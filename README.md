@@ -57,6 +57,9 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
   una operación si la respuesta anterior se perdió.
 - El primer login requiere conexión. Al cerrar sesión se eliminan los datos
   offline, las operaciones pendientes y la caché privada de ese usuario.
+- Al detectar el inicio de sesión de un usuario distinto en el mismo navegador,
+  se elimina por completo la copia offline anterior antes de cargar la nueva
+  sesión.
 - Si el navegador suspende la aplicación, la cola se reanuda al abrirla o al
   recuperar la conectividad; no se garantiza sincronización en segundo plano.
 

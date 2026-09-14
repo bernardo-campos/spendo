@@ -17,6 +17,7 @@ const recordKey = (type, id) => `${userId.value}:${type}:${id}`;
 const periodKey = (period) => `${userId.value}:transactions-period:${period}`;
 const preferenceKey = () => `${userId.value}:visualization-preferences`;
 const mappingKey = (temporaryId) => `${userId.value}:mapping:${temporaryId}`;
+const activeUserKey = 'spendo-offline:active-user';
 
 const openDatabase = () => {
     if (! databasePromise) {
@@ -97,6 +98,19 @@ const mutationValues = async () => {
 
 const putMutation = async (mutation) => transaction(MUTATIONS, 'readwrite', (store) => store.put(cloneForStorage(mutation)));
 const deleteMutation = async (id) => transaction(MUTATIONS, 'readwrite', (store) => store.delete(id));
+
+const clearAllOfflineData = async () => {
+    const database = await openDatabase();
+
+    await new Promise((resolve, reject) => {
+        const tx = database.transaction([STORE, MUTATIONS], 'readwrite');
+        tx.objectStore(STORE).clear();
+        tx.objectStore(MUTATIONS).clear();
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+};
 
 const routeInfo = (url) => {
     const path = String(url).split('?')[0];
@@ -526,9 +540,20 @@ const mutate = async (method, url, payload = undefined) => {
 };
 
 const initialize = async (id) => {
-    userId.value = String(id);
+    const nextUserId = String(id);
+    const previousUserId = await getValue(activeUserKey);
+    const changedUser = previousUserId !== undefined && previousUserId !== nextUserId;
+
+    if (changedUser) {
+        await clearAllOfflineData();
+    }
+
+    userId.value = nextUserId;
+    await setValue(activeUserKey, nextUserId);
     await updateSyncState();
     void sync();
+
+    return changedUser;
 };
 
 const clear = async () => {

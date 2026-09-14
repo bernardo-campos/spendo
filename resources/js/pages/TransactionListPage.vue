@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, ChevronDown, SlidersHorizontal } from '@lucide/vue';
+import { ArrowLeft, ChevronDown, Filter, SlidersHorizontal } from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
 import {
     Dialog,
@@ -23,6 +23,10 @@ const props = defineProps({
     loading: {
         type: Boolean,
         required: true,
+    },
+    showPaymentMethodFilter: {
+        type: Boolean,
+        default: false,
     },
     title: {
         type: String,
@@ -54,12 +58,28 @@ const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
 const GROUPING_STORAGE_KEY = 'spendo:transaction-list-grouping';
 const groupingDialogOpen = ref(false);
 const grouping = ref('day');
+const paymentMethodFilter = ref('all');
+const paymentMethodFilterDialogOpen = ref(false);
 const selectedGrouping = ref('day');
+const selectedPaymentMethodFilter = ref('all');
+
+const filteredTransactions = computed(() => {
+    if (!props.showPaymentMethodFilter || paymentMethodFilter.value === 'all') {
+        return props.transactions;
+    }
+
+    return props.transactions.filter((transaction) => transaction.payment_method === paymentMethodFilter.value);
+});
+
+const paymentMethodFilterLabel = computed(() => ({
+    cash: 'Efectivo',
+    credit: 'Crédito',
+}[paymentMethodFilter.value] ?? 'Ambos'));
 
 const groupedTransactions = computed(() => {
     const transactionsByGroup = new Map();
 
-    [...props.transactions]
+    [...filteredTransactions.value]
         .sort((left, right) => {
             if (grouping.value === 'category') {
                 const categoryOrder = (left.category?.name ?? 'Sin categoría')
@@ -158,6 +178,16 @@ const applyGrouping = () => {
     groupingDialogOpen.value = false;
 };
 
+const openPaymentMethodFilterDialog = () => {
+    selectedPaymentMethodFilter.value = paymentMethodFilter.value;
+    paymentMethodFilterDialogOpen.value = true;
+};
+
+const applyPaymentMethodFilter = () => {
+    paymentMethodFilter.value = selectedPaymentMethodFilter.value;
+    paymentMethodFilterDialogOpen.value = false;
+};
+
 onMounted(() => {
     const storedGrouping = localStorage.getItem(GROUPING_STORAGE_KEY);
 
@@ -177,15 +207,21 @@ onMounted(() => {
                 </button>
                 <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
             </div>
-            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="openGroupingDialog">
-                <SlidersHorizontal class="size-4" />
-                Agrupar
-            </button>
+            <div class="flex shrink-0 items-center gap-2">
+                <button v-if="showPaymentMethodFilter" type="button" class="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2" :class="paymentMethodFilter === 'all' ? 'border-slate-300 text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500' : 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 focus-visible:ring-amber-500 dark:border-amber-400 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950 dark:focus-visible:ring-amber-400'" :aria-label="paymentMethodFilter === 'all' ? 'Filtrar movimientos' : `Filtro activo: ${paymentMethodFilterLabel}`" :title="paymentMethodFilter === 'all' ? 'Filtrar movimientos' : `Filtro activo: ${paymentMethodFilterLabel}`" @click="openPaymentMethodFilterDialog">
+                    <Filter class="size-4" />
+                    <span class="hidden sm:inline">{{ paymentMethodFilter === 'all' ? 'Filtrar' : `Filtro: ${paymentMethodFilterLabel}` }}</span>
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" aria-label="Agrupar movimientos" title="Agrupar movimientos" @click="openGroupingDialog">
+                    <SlidersHorizontal class="size-4" />
+                    <span class="hidden sm:inline">Agrupar</span>
+                </button>
+            </div>
         </div>
 
         <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
             <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="transactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ emptyMessage }}</p>
+            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ paymentMethodFilter === 'all' ? emptyMessage : 'No hay egresos para este filtro.' }}</p>
             <div v-else class="space-y-5">
                 <section v-for="group in groupedTransactions" :key="group.key">
                     <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
@@ -250,6 +286,33 @@ onMounted(() => {
                 <DialogFooter>
                     <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">Cancelar</button></DialogClose>
                     <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="applyGrouping">Aplicar</button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-if="showPaymentMethodFilter" v-model:open="paymentMethodFilterDialogOpen">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Filtrar movimientos</DialogTitle>
+                    <DialogDescription>Elegí qué movimientos querés ver en el listado de egresos.</DialogDescription>
+                </DialogHeader>
+                <fieldset class="grid gap-2">
+                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                        <input v-model="selectedPaymentMethodFilter" value="all" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <span><span class="block font-medium">Ambos</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra movimientos en efectivo y crédito.</span></span>
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                        <input v-model="selectedPaymentMethodFilter" value="cash" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <span><span class="block font-medium">Efectivo</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra solamente movimientos pagados en efectivo.</span></span>
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                        <input v-model="selectedPaymentMethodFilter" value="credit" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <span><span class="block font-medium">Crédito</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra solamente movimientos pagados con tarjeta de crédito.</span></span>
+                    </label>
+                </fieldset>
+                <DialogFooter>
+                    <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">Cancelar</button></DialogClose>
+                    <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="applyPaymentMethodFilter">Aplicar</button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

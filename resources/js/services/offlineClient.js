@@ -552,11 +552,13 @@ const refresh = async (url, config) => {
 
 const get = async (url, config = {}) => {
     const { fresh = false, ...requestConfig } = config;
-    const cached = await cachedResponse(url, requestConfig.params);
+    const resolvedUrl = await resolveUrl(url);
+    const cached = await cachedResponse(resolvedUrl, requestConfig.params);
+    const hasUnresolvedTemporaryId = resolvedUrl === url && /local-[^/]+/.test(String(url));
 
     if (! fresh && cached !== null && cached !== undefined) {
-        if (navigator.onLine) {
-            void refresh(url, requestConfig);
+        if (navigator.onLine && ! hasUnresolvedTemporaryId) {
+            void refresh(resolvedUrl, requestConfig);
         }
         return { data: cached };
     }
@@ -565,8 +567,8 @@ const get = async (url, config = {}) => {
         throw offlineError();
     }
 
-    const response = await window.axios.get(url, requestConfig);
-    await cacheResponse(url, response.data, requestConfig.params);
+    const response = await window.axios.get(resolvedUrl, requestConfig);
+    await cacheResponse(resolvedUrl, response.data, requestConfig.params);
     return response;
 };
 

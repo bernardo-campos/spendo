@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import { buildInstallmentPreview, calculateFirstInstallmentPaymentDate, hasRealCycleForPurchaseDate } from '../utils/cardPaymentDates';
+import { formatLocalDate } from '../utils/localDate';
 
 const PAYMENT_METHODS = [
     { value: 'cash', label: 'Efectivo' },
@@ -13,7 +14,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
         amount: '',
         currency: 'ARS',
         category_id: '',
-        purchase_date: new Date().toISOString().slice(0, 10),
+        purchase_date: formatLocalDate(),
         payment_method: 'cash',
         card_id: '',
         installments_count: 1,
@@ -81,7 +82,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
         form.value.amount = '';
         form.value.currency = 'ARS';
         form.value.category_id = '';
-        form.value.purchase_date = new Date().toISOString().slice(0, 10);
+        form.value.purchase_date = formatLocalDate();
         form.value.payment_method = 'cash';
         form.value.card_id = '';
         form.value.installments_count = 1;

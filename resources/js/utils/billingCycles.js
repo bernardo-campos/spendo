@@ -1,12 +1,4 @@
-const toDateParts = (value) => {
-    const [year, month, day] = String(value).slice(0, 10).split('-').map((part) => Number.parseInt(part, 10));
-
-    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-        return null;
-    }
-
-    return { year, month, day };
-};
+import { formatLocalDate } from './localDate';
 
 const formatDateParts = ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -47,12 +39,6 @@ const buildEstimatedCycle = (card, referenceDate) => {
     };
 };
 
-const todayAsDate = () => {
-    const today = new Date();
-
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
-};
-
 export const billingCyclesForCard = (card, monthsAroundToday = 12) => {
     const estimatedCycles = Array.from({ length: (monthsAroundToday * 2) + 1 }, (_, index) => {
         const offset = index - monthsAroundToday;
@@ -76,7 +62,7 @@ export const billingCyclesForCard = (card, monthsAroundToday = 12) => {
 
 export const billingCyclesAroundToday = (card) => {
     const cycles = billingCyclesForCard(card);
-    const today = formatDateParts(toDateParts(todayAsDate().toISOString().slice(0, 10)));
+    const today = formatLocalDate();
     const cyclesByDueDate = [...cycles]
         .sort((left, right) => String(left.due_date).localeCompare(String(right.due_date)));
     const currentCycle = cyclesByDueDate.find((cycle) => String(cycle.due_date) >= today) ?? null;

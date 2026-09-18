@@ -8,6 +8,7 @@ import { useNavigation } from '../composables/useNavigation';
 import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
 import { offlineClient } from '../services/offlineClient';
+import { currentLocalPeriod, formatLocalDate } from '../utils/localDate';
 import AdminLayout from './admin/AdminLayout.vue';
 import CardsPage from '../pages/CardsPage.vue';
 import CategoriesPage from '../pages/CategoriesPage.vue';
@@ -34,7 +35,7 @@ const EXPENSE_LIST_DISPLAY_DEFAULTS = {
     show_notes: false,
 };
 
-const selectedPeriod = ref(new Date().toISOString().slice(0, 7));
+const selectedPeriod = ref(currentLocalPeriod());
 const collapsedDatesByList = ref({
     income: new Set(),
     expense: new Set(),
@@ -122,7 +123,7 @@ const form = ref({
     amount: '',
     currency: 'ARS',
     category_id: '',
-    purchase_date: new Date().toISOString().slice(0, 10),
+    purchase_date: formatLocalDate(),
     payment_method: 'cash',
     card_id: '',
     installments_count: 1,

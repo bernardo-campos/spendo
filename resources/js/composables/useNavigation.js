@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { formatLocalDate } from '../utils/localDate';
 
 export const useNavigation = ({ form }) => {
     const screenPaths = {
@@ -70,7 +71,7 @@ export const useNavigation = ({ form }) => {
         form.value.description = '';
         form.value.amount = '';
         form.value.category_id = '';
-        form.value.purchase_date = new Date().toISOString().slice(0, 10);
+        form.value.purchase_date = formatLocalDate();
         form.value.payment_method = 'cash';
         form.value.card_id = '';
         form.value.installments_count = 1;

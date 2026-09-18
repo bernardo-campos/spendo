@@ -49,6 +49,7 @@ const loadingVisualizationPreferences = ref(true);
 const savingVisualizationPreferences = ref(false);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
+const places = ref([]);
 const { errorMessage, loading, runWithLoading, successMessage } = useAsyncAction();
 const { isDarkMode, toggleColorMode } = useColorMode();
 
@@ -121,6 +122,7 @@ const saveVisualizationPreferences = async () => {
 const form = ref({
     type: 'expense',
     description: '',
+    place: '',
     amount: '',
     currency: 'ARS',
     category_id: '',
@@ -244,6 +246,22 @@ const formatAmount = (value) => Number(value ?? 0).toLocaleString('es-AR', {
     maximumFractionDigits: 2,
 });
 
+const loadPlaces = async () => {
+    let response;
+
+    try {
+        response = await offlineClient.get('/transactions/places', { fresh: true });
+    } catch (error) {
+        if (! error.offlineUnavailable) {
+            throw error;
+        }
+
+        response = await offlineClient.get('/transactions/places');
+    }
+
+    places.value = response.data;
+};
+
 const openTransactionEdit = async (listedTransaction) => {
     const transactionId = listedTransaction.transaction_id ?? listedTransaction.id;
 
@@ -253,6 +271,7 @@ const openTransactionEdit = async (listedTransaction) => {
 
         form.value.type = transaction.type;
         form.value.description = transaction.description;
+        form.value.place = transaction.place ?? '';
         form.value.amount = transaction.amount;
         form.value.currency = transaction.currency ?? 'ARS';
         form.value.category_id = transaction.category_id ?? '';
@@ -351,7 +370,10 @@ watch(
         }
 
         if (screen === 'transaction-form') {
-            await runWithLoading(ensureTransactionFormData, 'No fue posible cargar los datos del formulario.');
+            await runWithLoading(
+                () => Promise.all([ensureTransactionFormData(), loadPlaces()]),
+                'No fue posible cargar los datos del formulario.'
+            );
         }
     },
     { immediate: true }
@@ -389,6 +411,7 @@ const submitTransaction = async () => {
         const payload = {
             type: form.value.type,
             description: form.value.description,
+            place: form.value.type === 'expense' ? form.value.place.trim() || null : null,
             amount: form.value.amount,
             currency: form.value.currency,
             purchase_date: form.value.purchase_date,
@@ -427,6 +450,10 @@ const submitTransaction = async () => {
                 isPending: createdTransaction.isPending,
                 queuedAt: createdTransaction.queuedAt,
             });
+            if (registeredType === 'expense' && createdTransaction.data.place) {
+                places.value = [...new Set([...places.value, createdTransaction.data.place])]
+                    .sort((left, right) => left.localeCompare(right, 'es-AR', { sensitivity: 'base' }));
+            }
         }
         resetTransactionForm();
         editingTransactionId.value = null;
@@ -490,7 +517,7 @@ const deleteTransaction = async () => {
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
 
-        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
+        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :places="places" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

@@ -48,6 +48,7 @@ class UpdateTransactionRequest extends FormRequest
             ],
             'type' => ['sometimes', Rule::in(['income', 'expense'])],
             'description' => ['sometimes', 'string', 'max:255'],
+            'place' => ['nullable', 'string', 'max:120'],
             'amount' => ['sometimes', 'numeric', 'gt:0'],
             'currency' => ['sometimes', Rule::enum(TransactionCurrency::class)],
             'purchase_date' => ['sometimes', 'date'],

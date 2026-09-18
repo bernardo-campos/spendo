@@ -69,6 +69,7 @@ export const useNavigation = ({ form }) => {
 
     const resetTransactionForm = () => {
         form.value.description = '';
+        form.value.place = '';
         form.value.amount = '';
         form.value.category_id = '';
         form.value.purchase_date = formatLocalDate();

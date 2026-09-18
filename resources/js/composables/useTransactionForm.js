@@ -11,6 +11,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
     const form = providedForm ?? ref({
         type: 'expense',
         description: '',
+        place: '',
         amount: '',
         currency: 'ARS',
         category_id: '',
@@ -79,6 +80,7 @@ export const useTransactionForm = ({ categories, cards, forcedTransactionType, e
 
     const resetTransactionForm = () => {
         form.value.description = '';
+        form.value.place = '';
         form.value.amount = '';
         form.value.currency = 'ARS';
         form.value.category_id = '';

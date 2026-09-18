@@ -29,6 +29,7 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::apiResource('cards', CardController::class);
     Route::apiResource('cards.billing-cycles', CardBillingCycleController::class)
         ->parameters(['billing-cycles' => 'billingCycle']);
+    Route::get('transactions/places', [TransactionController::class, 'places']);
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
     Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);

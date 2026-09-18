@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, Check, ChevronsUpDown } from '@lucide/vue';
+import { ArrowLeft, Check, ChevronsUpDown, MapPin } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import AmountEditor from '@/components/ui/AmountEditor.vue';
 import {
@@ -36,6 +36,7 @@ const props = defineProps({
     installmentPreview: { type: Array, required: true },
     isCreditPayment: { type: Boolean, required: true },
     paymentMethods: { type: Array, required: true },
+    places: { type: Array, required: true },
     saving: { type: Boolean, required: true },
     showInstallments: { type: Boolean, required: true },
     tags: { type: Array, required: true },
@@ -46,6 +47,7 @@ const emit = defineEmits(['back', 'delete', 'submit']);
 
 const tagSearch = ref('');
 const tagInputFocused = ref(false);
+const placeInputFocused = ref(false);
 const amountEditorOpen = ref(false);
 const amountInputRef = ref(null);
 
@@ -101,6 +103,18 @@ const filteredTags = computed(() => {
         && tag.name.toLocaleLowerCase('es-AR').includes(searchTerm));
 });
 
+const normalizedPlace = computed(() => String(props.form.place ?? ''));
+
+const filteredPlaces = computed(() => {
+    const searchTerm = normalizedPlace.value.trim().toLocaleLowerCase('es-AR');
+
+    return [...new Set(props.places.map((place) => String(place ?? '').trim()).filter(Boolean))]
+        .filter((place) => place.toLocaleLowerCase('es-AR').includes(searchTerm));
+});
+
+const placeMatchesSearch = computed(() => filteredPlaces.value
+    .some((place) => place.toLocaleLowerCase('es-AR') === normalizedPlace.value.trim().toLocaleLowerCase('es-AR')));
+
 const selectedTagName = (tagId) => selectedTags.value
     .find((tag) => String(tag.id) === String(tagId))?.name ?? '';
 
@@ -113,6 +127,15 @@ const selectFirstFilteredTag = () => {
     if (filteredTags.value[0]) {
         selectTag(filteredTags.value[0]);
     }
+};
+
+const selectPlace = (place) => {
+    props.form.place = place;
+    placeInputFocused.value = false;
+};
+
+const useTypedPlace = () => {
+    selectPlace(normalizedPlace.value.trim());
 };
 </script>
 
@@ -150,6 +173,27 @@ const selectFirstFilteredTag = () => {
                     <span class="font-medium">Descripción</span>
                     <input v-model="form.description" type="text" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                 </label>
+
+                <div v-if="form.type === 'expense'" class="space-y-1 text-sm">
+                    <span class="font-medium">Lugar <span class="font-normal text-slate-500 dark:text-slate-400">(opcional)</span></span>
+                    <div class="relative">
+                        <div class="flex w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                            <MapPin class="size-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                            <input v-model="form.place" type="text" maxlength="120" placeholder="Buscar o escribir un lugar..." class="min-w-0 flex-1 bg-transparent outline-none" @focus="placeInputFocused = true" @keydown.enter.prevent="filteredPlaces[0] ? selectPlace(filteredPlaces[0]) : useTypedPlace()">
+                            <button v-if="form.place" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" @click="form.place = ''">Limpiar</button>
+                        </div>
+
+                        <div v-if="placeInputFocused && (filteredPlaces.length > 0 || normalizedPlace.trim())" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                            <button v-for="place in filteredPlaces" :key="place" type="button" class="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @mousedown.prevent="selectPlace(place)">
+                                {{ place }}
+                            </button>
+                            <button v-if="normalizedPlace.trim() && !placeMatchesSearch" type="button" class="block w-full rounded-sm px-2 py-1.5 text-left text-sm font-medium hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @mousedown.prevent="useTypedPlace">
+                                Usar “{{ normalizedPlace.trim() }}”
+                            </button>
+                        </div>
+                    </div>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Elegí un lugar usado anteriormente o escribí uno nuevo.</span>
+                </div>
 
                 <div class="space-y-1 text-sm">
                     <span class="font-medium">Categoría</span>

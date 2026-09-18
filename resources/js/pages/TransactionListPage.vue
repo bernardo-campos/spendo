@@ -251,6 +251,7 @@ onMounted(() => {
                                                     {{ grouping === 'category' ? formatTransactionDate(transaction.purchase_date) : (transaction.category?.name ?? 'Sin categoría') }}
                                                 </p>
                                                 <p v-if="shouldShowExpenseField(transaction, 'show_tags') && tagNames(transaction)" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</p>
+                                                <p v-if="transaction.place" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.place }}</p>
                                                 <p v-if="shouldShowExpenseField(transaction, 'show_description')" class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
                                                 <p v-if="shouldShowExpenseField(transaction, 'show_notes') && transaction.notes" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.notes }}</p>
                                                 <p v-if="transactionTypeLabel(transaction) || transaction.installment_number" class="text-xs text-slate-500 dark:text-slate-400">

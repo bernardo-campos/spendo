@@ -50,6 +50,7 @@ class StoreTransactionRequest extends FormRequest
             ],
             'type' => ['required', Rule::in(['income', 'expense'])],
             'description' => ['required', 'string', 'max:255'],
+            'place' => ['nullable', 'string', 'max:120'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'currency' => ['sometimes', Rule::enum(TransactionCurrency::class)],
             'purchase_date' => ['required', 'date'],

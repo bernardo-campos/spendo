@@ -30,6 +30,7 @@ class Transaction extends Model
         'card_id',
         'type',
         'description',
+        'place',
         'amount',
         'currency',
         'purchase_date',

@@ -15,6 +15,7 @@ const uuid = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.ra
 const cloneForStorage = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 const recordKey = (type, id) => `${userId.value}:${type}:${id}`;
 const periodKey = (period) => `${userId.value}:transactions-period:${period}`;
+const placesKey = () => `${userId.value}:transaction-places`;
 const preferenceKey = () => `${userId.value}:visualization-preferences`;
 const mappingKey = (temporaryId) => `${userId.value}:mapping:${temporaryId}`;
 const activeUserKey = 'spendo-offline:active-user';
@@ -120,6 +121,10 @@ const routeInfo = (url) => {
         return { type: 'billing-cycles', id: nestedCycle[2] ?? null, parentId: nestedCycle[1], path };
     }
 
+    if (path === '/transactions/places') {
+        return { type: 'transaction-places', id: 'all', path };
+    }
+
     const resource = path.match(/^\/(categories|tags|cards|transactions)(?:\/([^/]+))?$/);
 
     if (resource) {
@@ -191,6 +196,11 @@ const cacheResponse = async (url, data, params = {}) => {
         return;
     }
 
+    if (route.type === 'transaction-places') {
+        await setValue(placesKey(), data);
+        return;
+    }
+
     if (['categories', 'tags', 'cards'].includes(route.type) && ! route.id) {
         await Promise.all(data.map((item) => writeRecord(route.type, item)));
         return;
@@ -211,6 +221,10 @@ const cachedResponse = async (url, params = {}) => {
 
     if (route.type === 'transactions' && ! route.id) {
         return transactionPeriod(params.period);
+    }
+
+    if (route.type === 'transaction-places') {
+        return getValue(placesKey());
     }
 
     if (['categories', 'tags', 'cards'].includes(route.type) && ! route.id) {

@@ -118,6 +118,7 @@ class TransactionController extends Controller
                 'card_id' => $card?->id,
                 'type' => $validated['type'],
                 'description' => $validated['description'],
+                'place' => $validated['place'] ?? null,
                 'amount' => $validated['amount'],
                 'currency' => $validated['currency'] ?? TransactionCurrency::ArgentinePeso,
                 'purchase_date' => $validated['purchase_date'],
@@ -166,6 +167,25 @@ class TransactionController extends Controller
         }
 
         return response()->json($transaction, 201);
+    }
+
+    public function places(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        abort_if($user === null, 401);
+
+        $places = Transaction::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->whereNotNull('place')
+            ->where('place', '!=', '')
+            ->select('place')
+            ->distinct()
+            ->orderBy('place')
+            ->pluck('place');
+
+        return response()->json($places);
     }
 
     public function show(Request $request, Transaction $transaction): JsonResponse

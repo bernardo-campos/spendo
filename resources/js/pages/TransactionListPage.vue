@@ -81,6 +81,14 @@ const groupedTransactions = computed(() => {
 
     [...filteredTransactions.value]
         .sort((left, right) => {
+            if (left.is_pending !== right.is_pending) {
+                return left.is_pending ? -1 : 1;
+            }
+
+            if (left.is_pending && right.is_pending) {
+                return String(right.queued_at ?? '').localeCompare(String(left.queued_at ?? ''));
+            }
+
             if (grouping.value === 'category') {
                 const categoryOrder = (left.category?.name ?? 'Sin categoría')
                     .localeCompare(right.category?.name ?? 'Sin categoría', 'es');

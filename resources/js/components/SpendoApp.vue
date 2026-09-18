@@ -62,6 +62,7 @@ const {
     tags,
 } = useCatalogs();
 const {
+    addTransaction,
     dashboardRecentTransactions,
     expenseTotals,
     expenseTransactions,
@@ -405,11 +406,13 @@ const submitTransaction = async () => {
 
         const isEditingTransaction = editingTransactionId.value !== null;
 
+        let createdTransaction;
+
         if (isEditingTransaction) {
             delete payload.installments_count;
             await offlineClient.mutate('put', `/transactions/${editingTransactionId.value}`, payload);
         } else {
-            await offlineClient.mutate('post', '/transactions', payload);
+            createdTransaction = await offlineClient.mutate('post', '/transactions', payload);
         }
 
         const registeredType = form.value.type;
@@ -417,11 +420,14 @@ const submitTransaction = async () => {
         successMessage.value = isEditingTransaction
             ? 'Transacción actualizada correctamente.'
             : 'Transacción guardada correctamente.';
-        invalidateTransactions();
-        await runWithLoading(
-            () => loadTransactions({ force: true }),
-            'No fue posible actualizar el listado de transacciones.',
-        );
+        if (isEditingTransaction) {
+            invalidateTransactions();
+        } else {
+            addTransaction(createdTransaction.data, {
+                isPending: createdTransaction.isPending,
+                queuedAt: createdTransaction.queuedAt,
+            });
+        }
         resetTransactionForm();
         editingTransactionId.value = null;
         forcedTransactionType.value = null;

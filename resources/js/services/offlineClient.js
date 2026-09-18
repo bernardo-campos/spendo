@@ -151,15 +151,36 @@ const writeTransactionPeriod = async (period, items) => {
 };
 
 const transactionPeriod = async (period) => {
-    const ids = await getValue(periodKey(period));
+    const ids = await getValue(periodKey(period)) ?? [];
+    const queuedMutations = (await mutationValues())
+        .filter((mutation) => {
+            const route = routeInfo(mutation.url);
+            const transactionDate = String(mutation.payload?.purchase_date ?? '').slice(0, 7);
 
-    if (! ids) {
+            return mutation.status === 'pending'
+                && mutation.method === 'post'
+                && route.type === 'transactions'
+                && route.id === null
+                && transactionDate === period;
+        })
+        .reverse();
+    const queuedTransactions = (await Promise.all(queuedMutations.map(async (mutation) => {
+        const transaction = await getValue(recordKey('transactions', mutation.localId));
+
+        return transaction ? { ...transaction, is_pending: true, queued_at: mutation.createdAt } : null;
+    }))).filter(Boolean);
+
+    if (ids.length === 0 && queuedTransactions.length === 0) {
         return null;
     }
 
     const items = await Promise.all(ids.map((id) => getValue(recordKey('transactions', id))));
+    const queuedIds = new Set(queuedTransactions.map((transaction) => String(transaction.id)));
 
-    return items.filter(Boolean);
+    return [
+        ...queuedTransactions,
+        ...items.filter((item) => item && !queuedIds.has(String(item.id))),
+    ];
 };
 
 const cacheResponse = async (url, data, params = {}) => {
@@ -560,7 +581,11 @@ const mutate = async (method, url, payload = undefined) => {
         await updateSyncState(navigator.onLine ? 'pending' : 'offline');
         void sync();
 
-        return { data: optimistic.item };
+        return {
+            data: optimistic.item,
+            isPending: true,
+            queuedAt: mutation.createdAt,
+        };
     } catch (error) {
         if (! navigator.onLine) {
             throw error;

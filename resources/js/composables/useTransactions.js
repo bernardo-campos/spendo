@@ -105,7 +105,29 @@ export const useTransactions = (selectedPeriod) => {
         loadedTransactionsPeriod.value = null;
     };
 
+    const addTransaction = (transaction, { isPending = false, queuedAt = null } = {}) => {
+        const listedTransaction = isPending
+            ? { ...transaction, is_pending: true, queued_at: queuedAt }
+            : transaction;
+        const transactionDate = listedTransaction.type === 'expense'
+            ? listedTransaction.payment_date ?? listedTransaction.purchase_date
+            : listedTransaction.purchase_date;
+
+        if (! isInSelectedPeriod(transactionDate)) {
+            invalidateTransactions();
+
+            return;
+        }
+
+        transactions.value = [
+            listedTransaction,
+            ...transactions.value.filter((item) => String(item.id) !== String(listedTransaction.id)),
+        ];
+        loadedTransactionsPeriod.value = selectedPeriod.value;
+    };
+
     return {
+        addTransaction,
         dashboardRecentTransactions,
         expenseTotals,
         expenseTransactions,

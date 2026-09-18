@@ -417,6 +417,10 @@ const submitTransaction = async () => {
             ? 'Transacción actualizada correctamente.'
             : 'Transacción guardada correctamente.';
         invalidateTransactions();
+        await runWithLoading(
+            () => loadTransactions({ force: true }),
+            'No fue posible actualizar el listado de transacciones.',
+        );
         resetTransactionForm();
         editingTransactionId.value = null;
         forcedTransactionType.value = null;

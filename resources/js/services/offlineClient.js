@@ -221,8 +221,28 @@ const enrichTransaction = async (payload, id) => {
     };
 };
 
-const updateCachedTransactionReferences = async (item, remove = false) => {
-    const periods = await valuesForPrefix(`${userId.value}:transactions-period:`);
+const compareTransactions = (left, right) => {
+    const leftDate = left.payment_date ?? left.purchase_date ?? '';
+    const rightDate = right.payment_date ?? right.purchase_date ?? '';
+    const dateOrder = String(rightDate).localeCompare(String(leftDate));
+
+    if (dateOrder !== 0) {
+        return dateOrder;
+    }
+
+    return String(right.created_at ?? '').localeCompare(String(left.created_at ?? ''));
+};
+
+const sortedTransactionIds = async (ids) => {
+    const items = await Promise.all(ids.map((id) => getValue(recordKey('transactions', id))));
+
+    return items
+        .filter(Boolean)
+        .sort(compareTransactions)
+        .map((item) => item.id);
+};
+
+const updateCachedTransactionReferences = async (item, remove = false, replacedId = null) => {
     const database = await openDatabase();
     const keys = await new Promise((resolve, reject) => {
         const found = [];
@@ -241,18 +261,31 @@ const updateCachedTransactionReferences = async (item, remove = false) => {
         cursorRequest.onerror = () => reject(cursorRequest.error);
     });
 
+    const itemPeriod = String(item.payment_date ?? item.purchase_date ?? '').slice(0, 7);
+    const itemPeriodKey = periodKey(itemPeriod);
+    const replacedIds = new Set([String(item.id)]);
+
+    if (replacedId !== null) {
+        replacedIds.add(String(replacedId));
+    }
+
     await Promise.all(keys.map(async (key) => {
         const ids = await getValue(key) ?? [];
-        const withoutCurrent = ids.filter((id) => String(id) !== String(item.id));
-        await setValue(key, remove ? withoutCurrent : [...withoutCurrent, item.id]);
+        const nextIds = ids.filter((id) => !replacedIds.has(String(id)));
+
+        if (! remove && key === itemPeriodKey) {
+            nextIds.push(item.id);
+        }
+
+        await setValue(key, await sortedTransactionIds(nextIds));
     }));
 
-    const itemPeriod = String(item.payment_date ?? item.purchase_date ?? '').slice(0, 7);
-    if (! remove && itemPeriod) {
+    if (! remove && itemPeriod && !keys.includes(itemPeriodKey)) {
         const ids = await getValue(periodKey(itemPeriod)) ?? [];
-        if (! ids.some((id) => String(id) === String(item.id))) {
-            await setValue(periodKey(itemPeriod), [...ids, item.id]);
-        }
+        const nextIds = ids.filter((id) => !replacedIds.has(String(id)));
+
+        nextIds.push(item.id);
+        await setValue(itemPeriodKey, await sortedTransactionIds(nextIds));
     }
 };
 
@@ -397,7 +430,11 @@ const reconcile = async (mutation, data) => {
 
     const localItem = await getValue(recordKey(route.type, mutation.localId ?? route.id));
     const item = route.type === 'cards' ? { ...localItem, ...data } : data;
-    if (mutation.method === 'post' && mutation.localId !== item.id) {
+    const replacedId = mutation.method === 'post' && mutation.localId !== item.id
+        ? mutation.localId
+        : null;
+
+    if (replacedId !== null) {
         await setValue(mappingKey(mutation.localId), item.id);
         await removeRecord(route.type, mutation.localId);
         if (route.type === 'billing-cycles') {
@@ -407,7 +444,7 @@ const reconcile = async (mutation, data) => {
 
     await writeRecord(route.type, item);
     if (route.type === 'transactions') {
-        await updateCachedTransactionReferences(item);
+        await updateCachedTransactionReferences(item, false, replacedId);
     }
     if (route.type === 'billing-cycles') {
         await updateCachedCardCycles(route.parentId, item);
@@ -479,11 +516,12 @@ const refresh = async (url, config) => {
 };
 
 const get = async (url, config = {}) => {
-    const cached = await cachedResponse(url, config.params);
+    const { fresh = false, ...requestConfig } = config;
+    const cached = await cachedResponse(url, requestConfig.params);
 
-    if (cached !== null && cached !== undefined) {
+    if (! fresh && cached !== null && cached !== undefined) {
         if (navigator.onLine) {
-            void refresh(url, config);
+            void refresh(url, requestConfig);
         }
         return { data: cached };
     }
@@ -492,8 +530,8 @@ const get = async (url, config = {}) => {
         throw offlineError();
     }
 
-    const response = await window.axios.get(url, config);
-    await cacheResponse(url, response.data, config.params);
+    const response = await window.axios.get(url, requestConfig);
+    await cacheResponse(url, response.data, requestConfig.params);
     return response;
 };
 

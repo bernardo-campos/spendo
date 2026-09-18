@@ -71,10 +71,10 @@ export const useTransactions = (selectedPeriod) => {
 
     const expenseTotals = computed(() => totalsByCurrency(expenseTransactions.value));
 
-    const loadTransactions = async () => {
+    const loadTransactions = async ({ force = false } = {}) => {
         const period = selectedPeriod.value;
 
-        if (loadedTransactionsPeriod.value === period) {
+        if (! force && loadedTransactionsPeriod.value === period) {
             transactionsLoading.value = false;
 
             return;
@@ -85,6 +85,7 @@ export const useTransactions = (selectedPeriod) => {
         try {
             const response = await offlineClient.get('/transactions', {
                 params: { period },
+                fresh: force,
             });
 
             if (selectedPeriod.value !== period) {

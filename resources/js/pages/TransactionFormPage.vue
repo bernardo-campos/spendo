@@ -148,7 +148,7 @@ const useTypedPlace = () => {
 
 <template>
     <section class="grid gap-6">
-        <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <article class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-white sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-900">
             <div class="mb-4 flex items-center gap-2">
                 <button type="button" class="rounded-md p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-500" aria-label="Volver al listado" title="Volver al listado" @click="emit('back')">
                     <ArrowLeft class="size-4" />

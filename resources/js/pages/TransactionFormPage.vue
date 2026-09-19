@@ -81,6 +81,13 @@ const selectedCard = computed({
     },
 });
 
+const selectedCurrency = computed({
+    get: () => props.currencies.find((currency) => currency.value === props.form.currency) ?? props.currencies[0] ?? null,
+    set: (currency) => {
+        props.form.currency = currency?.value ?? 'ARS';
+    },
+});
+
 const selectedTags = computed(() => props.tags.filter((tag) => selectedTagValues.value.includes(String(tag.id))));
 
 const openAmountEditor = () => {
@@ -157,16 +164,30 @@ const useTypedPlace = () => {
                             <option value="income">Ingreso</option>
                         </select>
                     </label>
-                    <label class="block space-y-1 text-sm">
+                    <div class="space-y-1 text-sm sm:col-span-2">
                         <span class="font-medium">Monto</span>
-                        <input ref="amountInputRef" v-model="form.amount" type="number" min="0" step="0.01" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" @focus="openAmountEditor">
-                    </label>
-                    <label class="block space-y-1 text-sm">
-                        <span class="font-medium">Moneda</span>
-                        <select v-model="form.currency" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                            <option v-for="currency in currencies" :key="currency.value" :value="currency.value">{{ currency.label }}</option>
-                        </select>
-                    </label>
+                        <div class="flex w-full rounded-md">
+                            <input ref="amountInputRef" v-model="form.amount" type="number" min="0" step="0.01" required class="min-w-0 flex-1 rounded-l-md border border-r-0 border-slate-300 bg-white px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:focus-visible:ring-slate-500" @focus="openAmountEditor">
+                            <Combobox v-model="selectedCurrency" by="value">
+                                <ComboboxAnchor as-child class="w-14">
+                                    <ComboboxTrigger as-child>
+                                        <button type="button" class="flex w-14 shrink-0 items-center justify-center gap-0.5 rounded-r-md border border-slate-300 bg-white px-1.5 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900 dark:focus-visible:ring-slate-500" aria-label="Seleccionar moneda">
+                                            {{ selectedCurrency?.symbol ?? 'AR$' }}
+                                            <ChevronsUpDown class="size-3 text-slate-500 dark:text-slate-400" />
+                                        </button>
+                                    </ComboboxTrigger>
+                                </ComboboxAnchor>
+                                <ComboboxList class="w-60 border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" align="end">
+                                    <ComboboxGroup>
+                                        <ComboboxItem v-for="currency in currencies" :key="currency.value" :value="currency">
+                                            {{ currency.label }}
+                                            <ComboboxItemIndicator class="ml-auto"><Check class="size-4" /></ComboboxItemIndicator>
+                                        </ComboboxItem>
+                                    </ComboboxGroup>
+                                </ComboboxList>
+                            </Combobox>
+                        </div>
+                    </div>
                 </div>
 
                 <label class="block space-y-1 text-sm">

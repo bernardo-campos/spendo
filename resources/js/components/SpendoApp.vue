@@ -22,8 +22,8 @@ const rootElement = document.getElementById('spendo-app');
 const userName = rootElement?.dataset.userName ?? 'Usuario';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 const CURRENCY_OPTIONS = [
-    { value: 'ARS', label: 'Pesos argentinos (AR$)' },
-    { value: 'USD', label: 'Dólares (USD$)' },
+    { value: 'ARS', label: 'Pesos argentinos (AR$)', symbol: 'AR$' },
+    { value: 'USD', label: 'Dólares (USD$)', symbol: 'USD$' },
 ];
 const CURRENCY_SYMBOLS = { ARS: 'AR$', USD: 'USD$' };
 const EXPENSE_LIST_DISPLAY_DEFAULTS = {

@@ -10,6 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { transactionMatchesSearch } from '@/utils/transactionSearch';
 
 const props = defineProps({
     emptyMessage: {
@@ -73,13 +74,16 @@ const filteredTransactions = computed(() => {
         ? props.transactions
         : props.transactions.filter((transaction) => transaction.payment_method === paymentMethodFilter.value);
 
-    const normalizedSearchQuery = normalizeSearchValue(searchQuery.value);
-
-    if (normalizedSearchQuery === '') {
+    if (searchQuery.value.trim() === '') {
         return paymentMethodFilteredTransactions;
     }
 
-    return paymentMethodFilteredTransactions.filter((transaction) => matchesSearch(transaction, normalizedSearchQuery));
+    return paymentMethodFilteredTransactions.filter((transaction) => transactionMatchesSearch(
+        transaction,
+        searchQuery.value,
+        searchFields.value,
+        props.formatCurrencyAmount,
+    ));
 });
 
 const paymentMethodFilterLabel = computed(() => ({
@@ -156,25 +160,6 @@ const formatTransactionDate = (value) => {
 const tagNames = (transaction) => (transaction.tags ?? [])
     .map((tag) => tag.name)
     .join(' | ');
-
-const normalizeSearchValue = (value) => String(value ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase('es-AR');
-
-const matchesSearch = (transaction, normalizedSearchQuery) => {
-    const searchableValues = {
-        amount: [transaction.amount, formatCurrencyAmount(transaction.currency, transaction.amount)],
-        category: [transaction.category?.name],
-        description: [transaction.description],
-        place: [transaction.place],
-        tags: [tagNames(transaction)],
-        notes: [transaction.notes],
-    };
-
-    return searchFields.value.some((field) => searchableValues[field]
-        ?.some((value) => normalizeSearchValue(value).includes(normalizedSearchQuery)));
-};
 
 const transactionTypeLabel = (transaction) => {
     if (transaction.type === 'income') {

@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, ChevronDown, Filter, SlidersHorizontal } from '@lucide/vue';
+import { ArrowLeft, ChevronDown, Filter, Search, SlidersHorizontal } from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
 import {
     Dialog,
@@ -60,21 +60,34 @@ const groupingDialogOpen = ref(false);
 const grouping = ref('day');
 const paymentMethodFilter = ref('all');
 const paymentMethodFilterDialogOpen = ref(false);
+const searchDialogOpen = ref(false);
+const searchQuery = ref('');
+const searchFields = ref(['amount', 'category', 'description', 'place', 'tags', 'notes']);
 const selectedGrouping = ref('day');
 const selectedPaymentMethodFilter = ref('all');
+const selectedSearchFields = ref([...searchFields.value]);
+const selectedSearchQuery = ref('');
 
 const filteredTransactions = computed(() => {
-    if (!props.showPaymentMethodFilter || paymentMethodFilter.value === 'all') {
-        return props.transactions;
+    const paymentMethodFilteredTransactions = !props.showPaymentMethodFilter || paymentMethodFilter.value === 'all'
+        ? props.transactions
+        : props.transactions.filter((transaction) => transaction.payment_method === paymentMethodFilter.value);
+
+    const normalizedSearchQuery = normalizeSearchValue(searchQuery.value);
+
+    if (normalizedSearchQuery === '') {
+        return paymentMethodFilteredTransactions;
     }
 
-    return props.transactions.filter((transaction) => transaction.payment_method === paymentMethodFilter.value);
+    return paymentMethodFilteredTransactions.filter((transaction) => matchesSearch(transaction, normalizedSearchQuery));
 });
 
 const paymentMethodFilterLabel = computed(() => ({
     cash: 'Efectivo',
     credit: 'Crédito',
 }[paymentMethodFilter.value] ?? 'Ambos'));
+
+const isSearchActive = computed(() => searchQuery.value.trim() !== '');
 
 const groupedTransactions = computed(() => {
     const transactionsByGroup = new Map();
@@ -144,6 +157,25 @@ const tagNames = (transaction) => (transaction.tags ?? [])
     .map((tag) => tag.name)
     .join(' | ');
 
+const normalizeSearchValue = (value) => String(value ?? '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es-AR');
+
+const matchesSearch = (transaction, normalizedSearchQuery) => {
+    const searchableValues = {
+        amount: [transaction.amount, formatCurrencyAmount(transaction.currency, transaction.amount)],
+        category: [transaction.category?.name],
+        description: [transaction.description],
+        place: [transaction.place],
+        tags: [tagNames(transaction)],
+        notes: [transaction.notes],
+    };
+
+    return searchFields.value.some((field) => searchableValues[field]
+        ?.some((value) => normalizeSearchValue(value).includes(normalizedSearchQuery)));
+};
+
 const transactionTypeLabel = (transaction) => {
     if (transaction.type === 'income') {
         return 'Ingreso';
@@ -196,6 +228,18 @@ const applyPaymentMethodFilter = () => {
     paymentMethodFilterDialogOpen.value = false;
 };
 
+const openSearchDialog = () => {
+    selectedSearchQuery.value = searchQuery.value;
+    selectedSearchFields.value = [...searchFields.value];
+    searchDialogOpen.value = true;
+};
+
+const applySearch = () => {
+    searchQuery.value = selectedSearchQuery.value;
+    searchFields.value = [...selectedSearchFields.value];
+    searchDialogOpen.value = false;
+};
+
 onMounted(() => {
     const storedGrouping = localStorage.getItem(GROUPING_STORAGE_KEY);
 
@@ -220,6 +264,10 @@ onMounted(() => {
                     <Filter class="size-4" />
                     <span class="hidden sm:inline">{{ paymentMethodFilter === 'all' ? 'Filtrar' : `Filtro: ${paymentMethodFilterLabel}` }}</span>
                 </button>
+                <button v-if="showPaymentMethodFilter" type="button" class="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2" :class="isSearchActive ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 focus-visible:ring-amber-500 dark:border-amber-400 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950 dark:focus-visible:ring-amber-400' : 'border-slate-300 text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500'" :aria-label="isSearchActive ? `Búsqueda activa: ${searchQuery}` : 'Buscar movimientos'" :title="isSearchActive ? `Búsqueda activa: ${searchQuery}` : 'Buscar movimientos'" @click="openSearchDialog">
+                    <Search class="size-4" />
+                    <span class="hidden sm:inline">Buscar</span>
+                </button>
                 <button type="button" class="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" aria-label="Agrupar movimientos" title="Agrupar movimientos" @click="openGroupingDialog">
                     <SlidersHorizontal class="size-4" />
                     <span class="hidden sm:inline">Agrupar</span>
@@ -229,7 +277,7 @@ onMounted(() => {
 
         <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
             <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ paymentMethodFilter === 'all' ? emptyMessage : 'No hay egresos para este filtro.' }}</p>
+            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (paymentMethodFilter === 'all' ? emptyMessage : 'No hay egresos para este filtro.') }}</p>
             <div v-else class="space-y-5">
                 <section v-for="group in groupedTransactions" :key="group.key">
                     <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
@@ -322,6 +370,34 @@ onMounted(() => {
                 <DialogFooter>
                     <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">Cancelar</button></DialogClose>
                     <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="applyPaymentMethodFilter">Aplicar</button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-if="showPaymentMethodFilter" v-model:open="searchDialogOpen">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Buscar egresos</DialogTitle>
+                    <DialogDescription>La búsqueda se realiza dentro del período seleccionado.</DialogDescription>
+                </DialogHeader>
+                <div class="grid gap-4">
+                    <label class="grid gap-2 text-sm font-medium">
+                        Buscar
+                        <input v-model="selectedSearchQuery" type="search" placeholder="Ingresá un valor" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal dark:border-slate-700 dark:bg-slate-950">
+                    </label>
+                    <fieldset class="grid gap-2">
+                        <legend class="text-sm font-medium">Buscar en</legend>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label v-for="field in [{ value: 'amount', label: 'Monto' }, { value: 'category', label: 'Categoría' }, { value: 'description', label: 'Descripción' }, { value: 'place', label: 'Lugar' }, { value: 'tags', label: 'Etiquetas' }, { value: 'notes', label: 'Nota' }]" :key="field.value" class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                                <input v-model="selectedSearchFields" :value="field.value" type="checkbox" class="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                                {{ field.label }}
+                            </label>
+                        </div>
+                    </fieldset>
+                </div>
+                <DialogFooter>
+                    <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">Cancelar</button></DialogClose>
+                    <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="applySearch">Aplicar</button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

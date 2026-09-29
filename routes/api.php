@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\CardBillingCycleController;
 use App\Http\Controllers\Api\V1\CardController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CurrencyExchangeController;
 use App\Http\Controllers\Api\V1\InstallmentPlanController;
 use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
@@ -15,6 +16,8 @@ Route::middleware(['auth:sanctum', 'verified'])->name('api.v1.')->group(function
     Route::apiResource('cards.billing-cycles', CardBillingCycleController::class)
         ->parameters(['billing-cycles' => 'billingCycle']);
     Route::get('transactions/places', [TransactionController::class, 'places']);
+    Route::get('currency-exchanges/latest', [CurrencyExchangeController::class, 'latest']);
+    Route::apiResource('currency-exchanges', CurrencyExchangeController::class)->except('index');
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
 });

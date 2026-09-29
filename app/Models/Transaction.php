@@ -25,6 +25,7 @@ class Transaction extends Model
      */
     protected $fillable = [
         'user_id',
+        'exchange_id',
         'category_id',
         'payment_method',
         'card_id',
@@ -54,6 +55,11 @@ class Transaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function exchange(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyExchange::class, 'exchange_id');
     }
 
     public function category(): BelongsTo

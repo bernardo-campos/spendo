@@ -24,7 +24,7 @@ defineProps({
     },
 });
 
-const emit = defineEmits(['create-expense', 'navigate']);
+const emit = defineEmits(['create-expense', 'create-exchange', 'navigate']);
 
 const visibleCurrencyTotals = (totals) => Object.entries(totals)
     .filter(([currency, amount]) => currency !== 'USD' || Number(amount) !== 0);
@@ -51,14 +51,15 @@ const visibleCurrencyTotals = (totals) => Object.entries(totals)
             <li v-for="transaction in recentTransactions" :key="transaction.id" class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
                 <div>
                     <p class="font-medium">{{ transaction.description }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ transaction.type === 'expense' ? 'Gasto' : 'Ingreso' }} · {{ formatDate(transaction.purchase_date) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ transaction.exchange_id ? 'Cambio de moneda' : (transaction.type === 'expense' ? 'Gasto' : 'Ingreso') }} · {{ formatDate(transaction.purchase_date) }}</p>
                 </div>
-                <span class="font-semibold">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
+                <span class="font-semibold text-right">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}<template v-if="transaction.exchange_income"> → {{ formatCurrencyAmount(transaction.exchange_income.currency, transaction.exchange_income.amount) }}</template></span>
             </li>
         </ul>
     </section>
 
-    <div class="sticky bottom-4 mt-4 flex justify-end">
+    <div class="sticky bottom-4 mt-4 flex justify-end gap-2">
+        <button type="button" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-md hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800" @click="emit('create-exchange')">Cambio de moneda</button>
         <button type="button" class="flex size-12 items-center justify-center rounded-full bg-slate-900 text-2xl font-medium leading-none text-white shadow-md hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-950" aria-label="Registrar egreso" title="Registrar egreso" @click="emit('create-expense')">
             <Plus class="size-6" :stroke-width="2.5" aria-hidden="true" />
         </button>

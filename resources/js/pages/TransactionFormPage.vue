@@ -166,6 +166,7 @@ const useTypedPlace = () => {
                         <select v-model="form.type" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                             <option value="expense">Gasto</option>
                             <option value="income">Ingreso</option>
+                            <option value="exchange">Cambio de moneda</option>
                         </select>
                     </label>
                     <div class="space-y-1 text-sm sm:col-span-2">

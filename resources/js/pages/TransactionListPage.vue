@@ -176,6 +176,9 @@ const tagNames = (transaction) => (transaction.tags ?? [])
     .join(' | ');
 
 const transactionTypeLabel = (transaction) => {
+    if (transaction.exchange_id) {
+        return 'Cambio de moneda';
+    }
     if (transaction.type === 'income') {
         return 'Ingreso';
     }

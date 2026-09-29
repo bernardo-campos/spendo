@@ -9,9 +9,11 @@ import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
 import { offlineClient } from '../services/offlineClient';
 import { currentLocalPeriod, formatLocalDate } from '../utils/localDate';
+import { exchangeReferenceAmounts, suggestedExchangeAmount } from '../utils/exchangeSuggestion';
 import AdminLayout from './admin/AdminLayout.vue';
 import CardsPage from '../pages/CardsPage.vue';
 import CategoriesPage from '../pages/CategoriesPage.vue';
+import CurrencyExchangeFormPage from '../pages/CurrencyExchangeFormPage.vue';
 import DashboardPage from '../pages/DashboardPage.vue';
 import TagsPage from '../pages/TagsPage.vue';
 import TransactionFormPage from '../pages/TransactionFormPage.vue';
@@ -132,6 +134,79 @@ const form = ref({
     installments_count: 1,
     notes: '',
     tag_ids: [],
+});
+const exchangeForm = ref({
+    source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
+    purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
+});
+const exchangeReturnScreen = ref('expense-list');
+const openExchangeForm = () => {
+    exchangeReturnScreen.value = 'expense-list';
+    exchangeForm.value = {
+        source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
+        purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
+    };
+    openTransactionForm('exchange');
+};
+const changeExchangeType = (type) => {
+    form.value.type = type;
+    forcedTransactionType.value = null;
+    navigateToScreen('transaction-form');
+};
+const returnFromExchange = () => {
+    editingTransactionId.value = null;
+    forcedTransactionType.value = null;
+    navigateToScreen(exchangeReturnScreen.value);
+};
+const latestExchange = ref(null);
+const hasExchangeSuggestion = computed(() => latestExchange.value !== null);
+const suggestExchangeAmount = (editedSide) => {
+    const amounts = exchangeReferenceAmounts(latestExchange.value, exchangeForm.value.source_currency, exchangeForm.value.target_currency);
+    if (!amounts) {
+        return;
+    }
+    if (editedSide === 'source' && !exchangeForm.value.target_amount && Number(exchangeForm.value.source_amount) > 0) {
+        exchangeForm.value.target_amount = suggestedExchangeAmount(exchangeForm.value.source_amount, amounts.source, amounts.target);
+    } else if (editedSide === 'target' && !exchangeForm.value.source_amount && Number(exchangeForm.value.target_amount) > 0) {
+        exchangeForm.value.source_amount = suggestedExchangeAmount(exchangeForm.value.target_amount, amounts.target, amounts.source);
+    }
+};
+const loadExchangeSuggestion = async () => {
+    latestExchange.value = null;
+    const sourceCurrency = exchangeForm.value.source_currency;
+    const targetCurrency = exchangeForm.value.target_currency;
+    if (sourceCurrency === targetCurrency) {
+        return;
+    }
+    try {
+        const response = await offlineClient.get('/currency-exchanges/latest', {
+            params: { source_currency: sourceCurrency, target_currency: targetCurrency },
+            fresh: true,
+        });
+        if (exchangeForm.value.source_currency === sourceCurrency && exchangeForm.value.target_currency === targetCurrency) {
+            latestExchange.value = response.data;
+        }
+    } catch (error) {
+        if (error.offlineUnavailable) {
+            try {
+                const response = await offlineClient.get('/currency-exchanges/latest', {
+                    params: { source_currency: sourceCurrency, target_currency: targetCurrency },
+                });
+                if (exchangeForm.value.source_currency === sourceCurrency && exchangeForm.value.target_currency === targetCurrency) {
+                    latestExchange.value = response.data;
+                }
+            } catch {
+                latestExchange.value = null;
+            }
+        } else {
+            console.error('No fue posible cargar la última cotización.', error);
+        }
+    }
+};
+watch(() => [form.value.type, exchangeForm.value.source_currency, exchangeForm.value.target_currency], ([type]) => {
+    if (type === 'exchange') {
+        void loadExchangeSuggestion();
+    }
 });
 
 const {
@@ -263,6 +338,10 @@ const loadPlaces = async () => {
 };
 
 const openTransactionEdit = async (listedTransaction) => {
+    if (listedTransaction.exchange_id) {
+        await openExchangeEdit(listedTransaction.exchange_id, listedTransaction.type === 'income' ? 'income-list' : 'expense-list');
+        return;
+    }
     const transactionId = listedTransaction.transaction_id ?? listedTransaction.id;
 
     await runWithLoading(async () => {
@@ -287,6 +366,28 @@ const openTransactionEdit = async (listedTransaction) => {
     }, 'No fue posible cargar la transacción.');
 };
 
+const openExchangeEdit = async (exchangeId, returnScreen = 'expense-list') => {
+    exchangeReturnScreen.value = returnScreen;
+    await runWithLoading(async () => {
+        const response = await offlineClient.get(`/currency-exchanges/${exchangeId}`);
+        const exchange = response.data;
+        exchangeForm.value = {
+            source_currency: exchange.expense.currency,
+            source_amount: exchange.expense.amount,
+            target_currency: exchange.income.currency,
+            target_amount: exchange.income.amount,
+            purchase_date: toInputDateValue(exchange.expense.purchase_date),
+            description: exchange.expense.description,
+            place: exchange.expense.place ?? '',
+            notes: exchange.expense.notes ?? '',
+        };
+        form.value.type = 'exchange';
+        editingTransactionId.value = exchange.id;
+        forcedTransactionType.value = 'exchange';
+        navigateToScreen('transaction-form');
+    }, 'No fue posible cargar el cambio de moneda.');
+};
+
 onMounted(() => {
     void loadVisualizationPreferences();
 
@@ -295,7 +396,11 @@ onMounted(() => {
     }
 
     if (editingTransactionId.value !== null) {
-        void openTransactionEdit({ id: editingTransactionId.value });
+        if (forcedTransactionType.value === 'exchange') {
+            void openExchangeEdit(editingTransactionId.value);
+        } else {
+            void openTransactionEdit({ id: editingTransactionId.value });
+        }
 
         return;
     }
@@ -386,6 +491,14 @@ watch(
     }
 );
 
+watch(() => offlineSyncState.value.status, async (status) => {
+    if (status === 'synced' && offlineSyncState.value.pending === 0 && offlineSyncState.value.failed === 0
+        && ['dashboard', 'income-list', 'expense-list'].includes(activeScreen.value)) {
+        invalidateTransactions();
+        await runWithLoading(() => loadTransactions({ force: true }), 'No fue posible actualizar las transacciones.');
+    }
+});
+
 watch(
     () => activeScreen.value,
     () => {
@@ -403,6 +516,10 @@ const toInputDateValue = (value) => {
 };
 
 const submitTransaction = async () => {
+    if (form.value.type === 'exchange') {
+        await submitExchange();
+        return;
+    }
     savingTransaction.value = true;
     errorMessage.value = '';
     successMessage.value = '';
@@ -466,6 +583,52 @@ const submitTransaction = async () => {
     }
 };
 
+const submitExchange = async () => {
+    savingTransaction.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+        const payload = {
+            ...exchangeForm.value,
+            place: exchangeForm.value.place.trim() || null,
+            notes: exchangeForm.value.notes.trim() || null,
+        };
+        const editing = editingTransactionId.value !== null;
+        const url = editing ? `/currency-exchanges/${editingTransactionId.value}` : '/currency-exchanges';
+        await offlineClient.mutate(editing ? 'put' : 'post', url, payload);
+        invalidateTransactions();
+        successMessage.value = editing ? 'Cambio de moneda actualizado.' : 'Cambio de moneda guardado.';
+        editingTransactionId.value = null;
+        forcedTransactionType.value = null;
+        navigateToScreen(exchangeReturnScreen.value);
+        await loadTransactions();
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? error?.message ?? 'No fue posible guardar el cambio de moneda.';
+    } finally {
+        savingTransaction.value = false;
+    }
+};
+
+const deleteExchange = async () => {
+    if (editingTransactionId.value === null || !window.confirm('¿Eliminar este cambio de moneda y sus dos movimientos?')) {
+        return;
+    }
+    deletingTransaction.value = true;
+    try {
+        await offlineClient.mutate('delete', `/currency-exchanges/${editingTransactionId.value}`);
+        invalidateTransactions();
+        editingTransactionId.value = null;
+        forcedTransactionType.value = null;
+        successMessage.value = 'Cambio de moneda eliminado.';
+        navigateToScreen(exchangeReturnScreen.value);
+        await loadTransactions();
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? error?.message ?? 'No fue posible eliminar el cambio de moneda.';
+    } finally {
+        deletingTransaction.value = false;
+    }
+};
+
 const deleteTransaction = async () => {
     if (editingTransactionId.value === null || !window.confirm('¿Eliminar esta transacción? Esta acción no se puede deshacer.')) {
         return;
@@ -515,9 +678,11 @@ const deleteTransaction = async () => {
 
         <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :display-preferences="expenseListDisplayPreferences" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :show-payment-method-filter="true" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
-        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @navigate="setActiveScreenFromMenu" />
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @create-exchange="openExchangeForm" @navigate="setActiveScreenFromMenu" />
 
-        <TransactionFormPage v-if="activeScreen === 'transaction-form'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :places="places" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
+        <TransactionFormPage v-if="activeScreen === 'transaction-form' && form.type !== 'exchange'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :places="places" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
+
+        <CurrencyExchangeFormPage v-if="activeScreen === 'transaction-form' && form.type === 'exchange'" :form="exchangeForm" :currencies="CURRENCY_OPTIONS" :editing="editingTransactionId !== null" :saving="savingTransaction" :deleting="deletingTransaction" :has-suggestion="hasExchangeSuggestion" @back="returnFromExchange" @submit="submitExchange" @delete="deleteExchange" @change-type="changeExchangeType" @source-input="suggestExchangeAmount('source')" @target-input="suggestExchangeAmount('target')" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

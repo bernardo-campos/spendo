@@ -64,9 +64,24 @@ export const useTransactions = (selectedPeriod) => {
             }];
         }));
 
-    const dashboardRecentTransactions = computed(() => [...incomeTransactions.value, ...expenseTransactions.value]
-        .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
-        .slice(0, 10));
+    const dashboardRecentTransactions = computed(() => {
+        const combined = [...incomeTransactions.value, ...expenseTransactions.value];
+        const exchanges = new Map();
+
+        combined.filter((item) => item.exchange_id).forEach((item) => {
+            const pair = exchanges.get(String(item.exchange_id)) ?? {};
+            pair[item.type] = item;
+            exchanges.set(String(item.exchange_id), pair);
+        });
+
+        return combined
+            .filter((item) => !item.exchange_id || item.type === 'expense')
+            .map((item) => item.exchange_id
+                ? { ...item, exchange_income: exchanges.get(String(item.exchange_id))?.income }
+                : item)
+            .sort((left, right) => String(right.purchase_date).localeCompare(String(left.purchase_date)))
+            .slice(0, 10);
+    });
 
     const incomeTotals = computed(() => totalsByCurrency(incomeTransactions.value));
 

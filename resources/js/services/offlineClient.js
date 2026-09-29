@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { optimisticExchange } from '../utils/exchangeOffline';
 
 const DATABASE_NAME = 'spendo-offline';
 const DATABASE_VERSION = 1;
@@ -125,7 +126,11 @@ const routeInfo = (url) => {
         return { type: 'transaction-places', id: 'all', path };
     }
 
-    const resource = path.match(/^\/(categories|tags|cards|transactions)(?:\/([^/]+))?$/);
+    if (path === '/currency-exchanges/latest') {
+        return { type: 'currency-exchange-latest', id: 'latest', path };
+    }
+
+    const resource = path.match(/^\/(categories|tags|cards|transactions|currency-exchanges)(?:\/([^/]+))?$/);
 
     if (resource) {
         return { type: resource[1], id: resource[2] ?? null, path };
@@ -150,9 +155,57 @@ const writeRecord = async (type, item) => {
 
 const removeRecord = async (type, id) => deleteValue(recordKey(type, id));
 
+const exchangeMatches = (exchange, sourceCurrency, targetCurrency) => {
+    const currencies = [exchange?.expense?.currency, exchange?.income?.currency];
+    return currencies.includes(sourceCurrency) && currencies.includes(targetCurrency);
+};
+
+const cachedExchanges = async () => {
+    const saved = await collection('currency-exchanges');
+    const transactions = await collection('transactions');
+    const paired = new Map();
+    transactions.filter((item) => item.exchange_id).forEach((item) => {
+        const id = String(item.exchange_id);
+        const exchange = paired.get(id) ?? { id: item.exchange_id, created_at: item.created_at };
+        exchange[item.type] = item;
+        paired.set(id, exchange);
+    });
+
+    return [...new Map([...saved, ...paired.values()].filter((item) => item.expense && item.income)
+        .map((item) => [String(item.id), item])).values()];
+};
+
+const writeExchange = async (exchange) => {
+    await writeRecord('currency-exchanges', exchange);
+    for (const leg of [exchange.expense, exchange.income]) {
+        await writeRecord('transactions', leg);
+        await updateCachedTransactionReferences(leg);
+    }
+};
+
+const removeExchange = async (exchange) => {
+    for (const leg of [exchange.expense, exchange.income]) {
+        await updateCachedTransactionReferences(leg, true);
+        await removeRecord('transactions', leg.id);
+    }
+    await removeRecord('currency-exchanges', exchange.id);
+};
+
 const writeTransactionPeriod = async (period, items) => {
-    await Promise.all(items.map((item) => writeRecord('transactions', item)));
-    await setValue(periodKey(period), items.map((item) => item.id));
+    const pendingChanges = (await mutationValues())
+        .filter((mutation) => mutation.status === 'pending'
+            && routeInfo(mutation.url).type === 'currency-exchanges'
+            && routeInfo(mutation.url).id !== null);
+    const protectedExchangeIds = new Set(pendingChanges.map((mutation) => String(routeInfo(mutation.url).id)));
+    const serverItems = items.filter((item) => !protectedExchangeIds.has(String(item.exchange_id)));
+    const editedLegs = (await Promise.all(pendingChanges
+        .filter((mutation) => mutation.method === 'put')
+        .map(async (mutation) => {
+            const exchange = await getValue(recordKey('currency-exchanges', routeInfo(mutation.url).id));
+            return exchange ? [exchange.expense, exchange.income] : [];
+        }))).flat().filter((item) => String(item.purchase_date).slice(0, 7) === period);
+    await Promise.all(serverItems.map((item) => writeRecord('transactions', item)));
+    await setValue(periodKey(period), [...serverItems, ...editedLegs].map((item) => item.id));
 };
 
 const transactionPeriod = async (period) => {
@@ -163,17 +216,23 @@ const transactionPeriod = async (period) => {
             const transactionDate = String(mutation.payload?.purchase_date ?? '').slice(0, 7);
 
             return mutation.status === 'pending'
-                && mutation.method === 'post'
-                && route.type === 'transactions'
-                && route.id === null
+                && (mutation.method === 'post' || (route.type === 'currency-exchanges' && mutation.method === 'put'))
+                && ['transactions', 'currency-exchanges'].includes(route.type)
+                && (route.id === null || route.type === 'currency-exchanges')
                 && transactionDate === period;
         })
         .reverse();
     const queuedTransactions = (await Promise.all(queuedMutations.map(async (mutation) => {
-        const transaction = await getValue(recordKey('transactions', mutation.localId));
+        const route = routeInfo(mutation.url);
+        const exchange = route.type === 'currency-exchanges'
+            ? await getValue(recordKey('currency-exchanges', mutation.localId))
+            : null;
+        const transactions = exchange
+            ? [exchange.expense, exchange.income]
+            : [await getValue(recordKey('transactions', mutation.localId))];
 
-        return transaction ? { ...transaction, is_pending: true, queued_at: mutation.createdAt } : null;
-    }))).filter(Boolean);
+        return transactions.filter(Boolean).map((item) => ({ ...item, is_pending: true, queued_at: mutation.createdAt }));
+    }))).flat();
 
     if (ids.length === 0 && queuedTransactions.length === 0) {
         return null;
@@ -190,6 +249,26 @@ const transactionPeriod = async (period) => {
 
 const cacheResponse = async (url, data, params = {}) => {
     const route = routeInfo(url);
+
+    const hasPendingExchangeChange = async (exchangeId) => (await mutationValues()).some((mutation) => {
+        const pendingRoute = routeInfo(mutation.url);
+        return mutation.status === 'pending' && pendingRoute.type === 'currency-exchanges'
+            && String(pendingRoute.id ?? mutation.localId) === String(exchangeId);
+    });
+
+    if (route.type === 'currency-exchange-latest') {
+        if (data && !await hasPendingExchangeChange(data.id)) {
+            await writeExchange(data);
+        }
+        return;
+    }
+
+    if (route.type === 'currency-exchanges' && route.id && data) {
+        if (!await hasPendingExchangeChange(data.id)) {
+            await writeExchange(data);
+        }
+        return;
+    }
 
     if (route.type === 'transactions' && ! route.id) {
         await writeTransactionPeriod(params.period, data);
@@ -218,6 +297,17 @@ const cacheResponse = async (url, data, params = {}) => {
 
 const cachedResponse = async (url, params = {}) => {
     const route = routeInfo(url);
+
+    if (route.type === 'currency-exchange-latest') {
+        const exchanges = await cachedExchanges();
+        return exchanges
+            .filter((exchange) => exchangeMatches(exchange, params.source_currency, params.target_currency))
+            .sort((left, right) => String(right.created_at ?? right.id).localeCompare(String(left.created_at ?? left.id)))[0] ?? null;
+    }
+
+    if (route.type === 'currency-exchanges' && route.id) {
+        return (await cachedExchanges()).find((exchange) => String(exchange.id) === String(route.id)) ?? null;
+    }
 
     if (route.type === 'transactions' && ! route.id) {
         return transactionPeriod(params.period);
@@ -315,7 +405,7 @@ const updateCachedTransactionReferences = async (item, remove = false, replacedI
         await setValue(key, await sortedTransactionIds(nextIds));
     }));
 
-    if (! remove && itemPeriod && !keys.includes(itemPeriodKey)) {
+    if (! remove && itemPeriod && !keys.includes(itemPeriodKey) && !item.exchange_id) {
         const ids = await getValue(periodKey(itemPeriod)) ?? [];
         const nextIds = ids.filter((id) => !replacedIds.has(String(id)));
 
@@ -353,8 +443,25 @@ const applyOptimisticMutation = async (method, url, payload) => {
     }
 
     const id = route.id ?? `local-${uuid()}`;
-    const existing = route.id ? await getValue(recordKey(route.type, route.id)) : null;
+    const existing = route.id
+        ? (await getValue(recordKey(route.type, route.id))
+            ?? (route.type === 'currency-exchanges'
+                ? (await cachedExchanges()).find((exchange) => String(exchange.id) === String(route.id))
+                : null))
+        : null;
     let item;
+
+    if (route.type === 'currency-exchanges') {
+        if (method === 'delete') {
+            if (existing) {
+                await removeExchange(existing);
+            }
+            return { item: existing, localId: route.id };
+        }
+        item = optimisticExchange(payload, id, existing);
+        await writeExchange(item);
+        return { item, localId: id };
+    }
 
     if (method === 'delete') {
         if (existing) {
@@ -460,6 +567,16 @@ const reconcile = async (mutation, data) => {
     }
 
     if (! route.type || mutation.method === 'delete') {
+        return;
+    }
+
+    if (route.type === 'currency-exchanges') {
+        const localExchange = await getValue(recordKey(route.type, mutation.localId ?? route.id));
+        if (mutation.method === 'post' && localExchange && String(localExchange.id) !== String(data.id)) {
+            await setValue(mappingKey(localExchange.id), data.id);
+            await removeExchange(localExchange);
+        }
+        await writeExchange(data);
         return;
     }
 

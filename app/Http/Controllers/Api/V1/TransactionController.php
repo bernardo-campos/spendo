@@ -204,6 +204,7 @@ class TransactionController extends Controller
     public function update(UpdateTransactionRequest $request, Transaction $transaction): JsonResponse
     {
         abort_unless($transaction->user_id === $request->user()?->id, 404);
+        abort_if($transaction->exchange_id !== null, 422, 'Edite el cambio de moneda completo.');
 
         $validated = $request->validated();
         DB::transaction(function () use ($request, $transaction, $validated): void {
@@ -283,6 +284,7 @@ class TransactionController extends Controller
     public function destroy(Request $request, Transaction $transaction): JsonResponse
     {
         abort_unless($transaction->user_id === $request->user()?->id, 404);
+        abort_if($transaction->exchange_id !== null, 422, 'Elimine el cambio de moneda completo.');
 
         $transaction->delete();
 

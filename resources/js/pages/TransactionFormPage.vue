@@ -1,14 +1,7 @@
 <script setup>
-import { ArrowLeft, Check, ChevronsUpDown, MapPin } from '@lucide/vue';
+import { ArrowLeft, Check, ChevronsUpDown, MapPin, X } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import AmountEditor from '@/components/ui/AmountEditor.vue';
-import {
-    TagsInput,
-    TagsInputInput,
-    TagsInputItem,
-    TagsInputItemDelete,
-    TagsInputItemText,
-} from '@/components/ui/tags-input';
 import {
     Combobox,
     ComboboxAnchor,
@@ -229,16 +222,18 @@ const useTypedPlace = () => {
                     </div>
                 </div>
 
-                <label class="block space-y-1 text-sm">
+                <div class="block space-y-1 text-sm">
                     <span class="font-medium">Tags</span>
                     <div class="relative">
-                        <TagsInput v-model="selectedTagValues" class="min-h-10 w-full border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
-                            <TagsInputItem v-for="tagId in selectedTagValues" :key="tagId" :value="tagId" class="h-6 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                                <TagsInputItemText class="px-2 text-xs">{{ selectedTagName(tagId) }}</TagsInputItemText>
-                                <TagsInputItemDelete class="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" />
-                            </TagsInputItem>
-                            <TagsInputInput :value="tagSearch" placeholder="Buscar tags..." @blur="tagInputFocused = false" @focus="tagInputFocused = true" @input="tagSearch = $event.target.value" @keydown.enter.prevent="selectFirstFilteredTag" />
-                        </TagsInput>
+                        <div class="flex min-h-10 w-full flex-wrap items-center gap-2 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm shadow-xs focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-400/50 dark:border-slate-700 dark:bg-slate-950 dark:focus-within:border-slate-600 dark:focus-within:ring-slate-500/50">
+                            <span v-for="tagId in selectedTagValues" :key="tagId" class="inline-flex h-6 items-center gap-1 rounded bg-slate-100 px-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                {{ selectedTagName(tagId) }}
+                                <button type="button" class="rounded text-slate-500 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:text-slate-100" :aria-label="`Quitar tag ${selectedTagName(tagId)}`" @click="selectedTagValues = selectedTagValues.filter((selectedTagId) => selectedTagId !== tagId)">
+                                    <X class="size-3" />
+                                </button>
+                            </span>
+                            <input :value="tagSearch" type="text" autocomplete="off" aria-label="Buscar tags" placeholder="Buscar tags..." class="min-h-5 min-w-24 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400" @blur="tagInputFocused = false" @focus="tagInputFocused = true" @input="tagSearch = $event.target.value" @keydown.enter.stop.prevent="selectFirstFilteredTag">
+                        </div>
 
                         <div v-if="tagInputFocused && filteredTags.length > 0" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
                             <button v-for="tag in filteredTags" :key="tag.id" type="button" class="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @mousedown.prevent="selectTag(tag)">
@@ -247,7 +242,7 @@ const useTypedPlace = () => {
                         </div>
                     </div>
                     <span class="text-xs text-slate-500 dark:text-slate-400">Escribe para filtrar y presiona Enter o selecciona una etiqueta.</span>
-                </label>
+                </div>
 
                 <label class="block space-y-1 text-sm">
                     <span class="font-medium">Fecha</span>

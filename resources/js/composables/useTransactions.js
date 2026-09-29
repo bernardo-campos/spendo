@@ -107,9 +107,12 @@ export const useTransactions = (selectedPeriod) => {
     };
 
     const addTransaction = (transaction, { isPending = false, queuedAt = null } = {}) => {
-        const listedTransaction = isPending
-            ? { ...transaction, is_pending: true, queued_at: queuedAt }
-            : transaction;
+        const listedTransaction = {
+            ...transaction,
+            is_recently_created: true,
+            recently_created_at: queuedAt ?? new Date().toISOString(),
+            ...(isPending ? { is_pending: true, queued_at: queuedAt } : {}),
+        };
         const transactionDate = listedTransaction.type === 'expense'
             ? listedTransaction.payment_date ?? listedTransaction.purchase_date
             : listedTransaction.purchase_date;

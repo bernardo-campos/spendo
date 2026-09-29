@@ -92,18 +92,32 @@ const paymentMethodFilterLabel = computed(() => ({
 }[paymentMethodFilter.value] ?? 'Ambos'));
 
 const isSearchActive = computed(() => searchQuery.value.trim() !== '');
+const transactionDay = (transaction) => String(transaction.purchase_date ?? '').slice(0, 10);
+const isRecentlyCreated = (transaction) => transaction.is_pending || transaction.is_recently_created;
+const recentCreationTimestamp = (transaction) => transaction.queued_at
+    ?? transaction.recently_created_at
+    ?? transaction.created_at
+    ?? '';
 
 const groupedTransactions = computed(() => {
     const transactionsByGroup = new Map();
 
     [...filteredTransactions.value]
         .sort((left, right) => {
-            if (left.is_pending !== right.is_pending) {
-                return left.is_pending ? -1 : 1;
+            if (grouping.value === 'day') {
+                const purchaseDateOrder = transactionDay(right).localeCompare(transactionDay(left));
+
+                if (purchaseDateOrder !== 0) {
+                    return purchaseDateOrder;
+                }
             }
 
-            if (left.is_pending && right.is_pending) {
-                return String(right.queued_at ?? '').localeCompare(String(left.queued_at ?? ''));
+            if (isRecentlyCreated(left) !== isRecentlyCreated(right)) {
+                return isRecentlyCreated(left) ? -1 : 1;
+            }
+
+            if (isRecentlyCreated(left) && isRecentlyCreated(right)) {
+                return String(recentCreationTimestamp(right)).localeCompare(String(recentCreationTimestamp(left)));
             }
 
             if (grouping.value === 'category') {
@@ -127,7 +141,7 @@ const groupedTransactions = computed(() => {
             const categoryName = transaction.category?.name ?? 'Sin categoría';
             const groupKey = grouping.value === 'category'
                 ? `category-${transaction.category?.id ?? 'uncategorized'}`
-                : String(transaction.purchase_date).slice(0, 10);
+                : transactionDay(transaction);
             const group = transactionsByGroup.get(groupKey) ?? {
                 key: groupKey,
                 label: grouping.value === 'category' ? categoryName : null,

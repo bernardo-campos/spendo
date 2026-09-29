@@ -33,6 +33,17 @@ class StoreCurrencyExchangeRequest extends FormRequest
             'description' => ['required', 'string', 'max:255'],
             'place' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'category_id' => [
+                'nullable',
+                Rule::exists('categories', 'id')->where(fn ($query) => $query
+                    ->where('user_id', $this->user()->id)
+                    ->whereIn('scope', ['expense', 'both'])),
+            ],
+            'tag_ids' => ['sometimes', 'array'],
+            'tag_ids.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where(fn ($query) => $query->where('user_id', $this->user()->id)),
+            ],
         ];
     }
 }

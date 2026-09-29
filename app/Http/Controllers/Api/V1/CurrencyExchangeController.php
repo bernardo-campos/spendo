@@ -32,7 +32,7 @@ class CurrencyExchangeController extends Controller
                         ->whereHas('income', fn ($leg) => $leg->where('currency', $validated['source_currency']));
                 });
             })
-            ->with(['expense', 'income'])
+            ->with(['expense.category', 'expense.tags', 'income.tags'])
             ->latest('id')
             ->first();
 
@@ -91,18 +91,20 @@ class CurrencyExchangeController extends Controller
             'purchase_date' => $data['purchase_date'],
             'payment_date' => $data['purchase_date'],
             'notes' => $data['notes'] ?? null,
-            'category_id' => null,
             'card_id' => null,
         ];
 
-        Transaction::query()->updateOrCreate(
+        $expense = Transaction::query()->updateOrCreate(
             ['exchange_id' => $exchange->id, 'type' => 'expense'],
-            [...$shared, 'type' => 'expense', 'amount' => $data['source_amount'], 'currency' => $data['source_currency'], 'place' => $data['place'] ?? null, 'payment_method' => null],
+            [...$shared, 'type' => 'expense', 'amount' => $data['source_amount'], 'currency' => $data['source_currency'], 'place' => $data['place'] ?? null, 'payment_method' => null, 'category_id' => $data['category_id'] ?? null],
         );
-        Transaction::query()->updateOrCreate(
+        $income = Transaction::query()->updateOrCreate(
             ['exchange_id' => $exchange->id, 'type' => 'income'],
-            [...$shared, 'type' => 'income', 'amount' => $data['target_amount'], 'currency' => $data['target_currency'], 'place' => null, 'payment_method' => null],
+            [...$shared, 'type' => 'income', 'amount' => $data['target_amount'], 'currency' => $data['target_currency'], 'place' => null, 'payment_method' => null, 'category_id' => null],
         );
+
+        $expense->tags()->sync($data['tag_ids'] ?? []);
+        $income->tags()->sync($data['tag_ids'] ?? []);
     }
 
     private function authorizeOwner(Request $request, CurrencyExchange $exchange): void
@@ -112,7 +114,7 @@ class CurrencyExchangeController extends Controller
 
     private function respond(Request $request, CurrencyExchange $exchange, int $status = 200): JsonResponse
     {
-        $payload = $this->payload($exchange->fresh(['expense', 'income']));
+        $payload = $this->payload($exchange->fresh(['expense.category', 'expense.tags', 'income.tags']));
 
         return response()->json($request->routeIs('api.v1.*') ? ['data' => $payload] : $payload, $status);
     }

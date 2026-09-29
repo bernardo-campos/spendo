@@ -138,6 +138,7 @@ const form = ref({
 const exchangeForm = ref({
     source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
     purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
+    category_id: '', tag_ids: [],
 });
 const exchangeReturnScreen = ref('expense-list');
 const openExchangeForm = () => {
@@ -145,6 +146,7 @@ const openExchangeForm = () => {
     exchangeForm.value = {
         source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
         purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
+        category_id: '', tag_ids: [],
     };
     openTransactionForm('exchange');
 };
@@ -380,6 +382,8 @@ const openExchangeEdit = async (exchangeId, returnScreen = 'expense-list') => {
             description: exchange.expense.description,
             place: exchange.expense.place ?? '',
             notes: exchange.expense.notes ?? '',
+            category_id: exchange.expense.category_id ?? '',
+            tag_ids: (exchange.expense.tags ?? []).map((tag) => tag.id),
         };
         form.value.type = 'exchange';
         editingTransactionId.value = exchange.id;
@@ -592,6 +596,8 @@ const submitExchange = async () => {
             ...exchangeForm.value,
             place: exchangeForm.value.place.trim() || null,
             notes: exchangeForm.value.notes.trim() || null,
+            category_id: exchangeForm.value.category_id || null,
+            tag_ids: exchangeForm.value.tag_ids,
         };
         const editing = editingTransactionId.value !== null;
         const url = editing ? `/currency-exchanges/${editingTransactionId.value}` : '/currency-exchanges';
@@ -682,7 +688,7 @@ const deleteTransaction = async () => {
 
         <TransactionFormPage v-if="activeScreen === 'transaction-form' && form.type !== 'exchange'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :places="places" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 
-        <CurrencyExchangeFormPage v-if="activeScreen === 'transaction-form' && form.type === 'exchange'" :form="exchangeForm" :currencies="CURRENCY_OPTIONS" :editing="editingTransactionId !== null" :saving="savingTransaction" :deleting="deletingTransaction" :has-suggestion="hasExchangeSuggestion" @back="returnFromExchange" @submit="submitExchange" @delete="deleteExchange" @change-type="changeExchangeType" @source-input="suggestExchangeAmount('source')" @target-input="suggestExchangeAmount('target')" />
+        <CurrencyExchangeFormPage v-if="activeScreen === 'transaction-form' && form.type === 'exchange'" :form="exchangeForm" :currencies="CURRENCY_OPTIONS" :categories="categories" :tags="tags" :format-amount="formatAmount" :editing="editingTransactionId !== null" :saving="savingTransaction" :deleting="deletingTransaction" :has-suggestion="hasExchangeSuggestion" @back="returnFromExchange" @submit="submitExchange" @delete="deleteExchange" @change-type="changeExchangeType" @source-input="suggestExchangeAmount('source')" @target-input="suggestExchangeAmount('target')" />
 
         <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 

@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Category;
 use App\Models\CurrencyExchange;
+use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,6 +55,37 @@ test('exchange legs can only be edited or deleted together', function () {
     $this->deleteJson("/currency-exchanges/{$exchangeId}")->assertNoContent();
     expect(CurrencyExchange::query()->count())->toBe(0)
         ->and(Transaction::query()->count())->toBe(0);
+});
+
+test('an exchange saves its expense category and shares tags between both legs', function () {
+    $user = User::factory()->create();
+    $category = Category::query()->create(['user_id' => $user->id, 'name' => 'Ahorro', 'slug' => 'ahorro', 'scope' => 'expense']);
+    $tag = Tag::query()->create(['user_id' => $user->id, 'name' => 'Dólares', 'slug' => 'dolares']);
+    $exchangeId = $this->actingAs($user)->postJson('/currency-exchanges', exchangePayload([
+        'category_id' => $category->id, 'tag_ids' => [$tag->id],
+    ]))->assertCreated()
+        ->assertJsonPath('expense.category_id', $category->id)
+        ->assertJsonPath('expense.tags.0.id', $tag->id)
+        ->assertJsonPath('income.category_id', null)
+        ->assertJsonPath('income.tags.0.id', $tag->id)
+        ->json('id');
+
+    $this->putJson("/currency-exchanges/{$exchangeId}", exchangePayload([
+        'category_id' => null, 'tag_ids' => [],
+    ]))->assertSuccessful()->assertJsonPath('expense.category_id', null)
+        ->assertJsonCount(0, 'expense.tags')->assertJsonCount(0, 'income.tags');
+});
+
+test('exchange categories and tags must belong to the user and category must support expenses', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $incomeCategory = Category::query()->create(['user_id' => $user->id, 'name' => 'Sueldo', 'slug' => 'sueldo', 'scope' => 'income']);
+    $otherTag = Tag::query()->create(['user_id' => $other->id, 'name' => 'Ajeno', 'slug' => 'ajeno']);
+
+    $this->actingAs($user)->postJson('/currency-exchanges', exchangePayload([
+        'category_id' => $incomeCategory->id, 'tag_ids' => [$otherTag->id],
+    ]))->assertUnprocessable()->assertJsonValidationErrors(['category_id', 'tag_ids.0']);
+    expect(CurrencyExchange::query()->count())->toBe(0);
 });
 
 test('exchange input is validated and other users cannot read or change it', function () {

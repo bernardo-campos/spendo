@@ -1,4 +1,5 @@
 export const normalizeSearchValue = (value) => String(value ?? '')
+    .trim()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLocaleLowerCase('es-AR');

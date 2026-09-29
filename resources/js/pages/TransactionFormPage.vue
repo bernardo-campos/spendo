@@ -1,5 +1,6 @@
 <script setup>
 import { ArrowLeft, Check, ChevronsUpDown, MapPin, X } from '@lucide/vue';
+import { onClickOutside } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import AmountEditor from '@/components/ui/AmountEditor.vue';
 import {
@@ -41,8 +42,13 @@ const emit = defineEmits(['back', 'delete', 'submit']);
 const tagSearch = ref('');
 const tagInputFocused = ref(false);
 const placeInputFocused = ref(false);
+const placeFieldRef = ref(null);
 const amountEditorOpen = ref(false);
 const amountInputRef = ref(null);
+
+onClickOutside(placeFieldRef, () => {
+    placeInputFocused.value = false;
+});
 
 const selectedTagValues = computed({
     get: () => props.form.tag_ids.map((tagId) => String(tagId)),
@@ -103,6 +109,8 @@ const filteredTags = computed(() => {
         && tag.name.toLocaleLowerCase('es-AR').includes(searchTerm));
 });
 
+const isTagDropdownOpen = computed(() => tagInputFocused.value && filteredTags.value.length > 0);
+
 const normalizedPlace = computed(() => String(props.form.place ?? ''));
 
 const filteredPlaces = computed(() => {
@@ -111,6 +119,9 @@ const filteredPlaces = computed(() => {
     return [...new Set(props.places.map((place) => String(place ?? '').trim()).filter(Boolean))]
         .filter((place) => place.toLocaleLowerCase('es-AR').includes(searchTerm));
 });
+
+const isPlaceDropdownOpen = computed(() => placeInputFocused.value
+    && (filteredPlaces.value.length > 0 || normalizedPlace.value.trim()));
 
 const placeMatchesSearch = computed(() => filteredPlaces.value
     .some((place) => place.toLocaleLowerCase('es-AR') === normalizedPlace.value.trim().toLocaleLowerCase('es-AR')));
@@ -190,14 +201,14 @@ const useTypedPlace = () => {
 
                 <div v-if="form.type === 'expense'" class="space-y-1 text-sm">
                     <span class="font-medium">Lugar <span class="font-normal text-slate-500 dark:text-slate-400">(opcional)</span></span>
-                    <div class="relative">
+                    <div ref="placeFieldRef" class="relative">
                         <div class="flex w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                             <MapPin class="size-4 shrink-0 text-slate-500 dark:text-slate-400" />
                             <input v-model="form.place" type="text" maxlength="120" placeholder="Buscar o escribir un lugar..." class="min-w-0 flex-1 bg-transparent outline-none" @focus="placeInputFocused = true" @keydown.enter.prevent="filteredPlaces[0] ? selectPlace(filteredPlaces[0]) : useTypedPlace()">
-                            <button v-if="form.place" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" @click="form.place = ''">Limpiar</button>
+                            <button v-if="form.place || isPlaceDropdownOpen" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" @click="isPlaceDropdownOpen ? placeInputFocused = false : form.place = ''">{{ isPlaceDropdownOpen ? 'Cerrar' : 'Limpiar' }}</button>
                         </div>
 
-                        <div v-if="placeInputFocused && (filteredPlaces.length > 0 || normalizedPlace.trim())" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                        <div v-if="isPlaceDropdownOpen" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
                             <button v-for="place in filteredPlaces" :key="place" type="button" class="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @mousedown.prevent="selectPlace(place)">
                                 {{ place }}
                             </button>
@@ -233,9 +244,10 @@ const useTypedPlace = () => {
                                 </button>
                             </span>
                             <input :value="tagSearch" type="text" autocomplete="off" aria-label="Buscar tags" placeholder="Buscar tags..." class="min-h-5 min-w-24 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400" @blur="tagInputFocused = false" @focus="tagInputFocused = true" @input="tagSearch = $event.target.value" @keydown.enter.stop.prevent="selectFirstFilteredTag">
+                            <button v-if="isTagDropdownOpen" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" @click="tagInputFocused = false">Cerrar</button>
                         </div>
 
-                        <div v-if="tagInputFocused && filteredTags.length > 0" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                        <div v-if="isTagDropdownOpen" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
                             <button v-for="tag in filteredTags" :key="tag.id" type="button" class="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @mousedown.prevent="selectTag(tag)">
                                 {{ tag.name }}
                             </button>

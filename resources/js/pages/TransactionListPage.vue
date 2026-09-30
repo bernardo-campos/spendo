@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { transactionMatchesSearch } from '@/utils/transactionSearch';
+import { groupTransactions } from '@/utils/transactionGrouping';
 
 const props = defineProps({
     emptyMessage: {
@@ -92,71 +93,7 @@ const paymentMethodFilterLabel = computed(() => ({
 }[paymentMethodFilter.value] ?? 'Ambos'));
 
 const isSearchActive = computed(() => searchQuery.value.trim() !== '');
-const transactionDay = (transaction) => String(transaction.purchase_date ?? '').slice(0, 10);
-const isRecentlyCreated = (transaction) => transaction.is_pending || transaction.is_recently_created;
-const recentCreationTimestamp = (transaction) => transaction.queued_at
-    ?? transaction.recently_created_at
-    ?? transaction.created_at
-    ?? '';
-
-const groupedTransactions = computed(() => {
-    const transactionsByGroup = new Map();
-
-    [...filteredTransactions.value]
-        .sort((left, right) => {
-            if (grouping.value === 'day') {
-                const purchaseDateOrder = transactionDay(right).localeCompare(transactionDay(left));
-
-                if (purchaseDateOrder !== 0) {
-                    return purchaseDateOrder;
-                }
-            }
-
-            if (isRecentlyCreated(left) !== isRecentlyCreated(right)) {
-                return isRecentlyCreated(left) ? -1 : 1;
-            }
-
-            if (isRecentlyCreated(left) && isRecentlyCreated(right)) {
-                return String(recentCreationTimestamp(right)).localeCompare(String(recentCreationTimestamp(left)));
-            }
-
-            if (grouping.value === 'category') {
-                const categoryOrder = (left.category?.name ?? 'Sin categoría')
-                    .localeCompare(right.category?.name ?? 'Sin categoría', 'es');
-
-                if (categoryOrder !== 0) {
-                    return categoryOrder;
-                }
-            }
-
-            const purchaseDateOrder = String(right.purchase_date).localeCompare(String(left.purchase_date));
-
-            if (purchaseDateOrder !== 0) {
-                return purchaseDateOrder;
-            }
-
-            return String(right.created_at ?? '').localeCompare(String(left.created_at ?? ''));
-        })
-        .forEach((transaction) => {
-            const categoryName = transaction.category?.name ?? 'Sin categoría';
-            const groupKey = grouping.value === 'category'
-                ? `category-${transaction.category?.id ?? 'uncategorized'}`
-                : transactionDay(transaction);
-            const group = transactionsByGroup.get(groupKey) ?? {
-                key: groupKey,
-                label: grouping.value === 'category' ? categoryName : null,
-                totals: { ARS: 0, USD: 0 },
-                transactions: [],
-            };
-
-            const currency = ['ARS', 'USD'].includes(transaction.currency) ? transaction.currency : 'ARS';
-            group.totals[currency] += Number.parseFloat(transaction.amount ?? 0) || 0;
-            group.transactions.push(transaction);
-            transactionsByGroup.set(groupKey, group);
-        });
-
-    return [...transactionsByGroup.values()];
-});
+const groupedTransactions = computed(() => groupTransactions(filteredTransactions.value, grouping.value));
 
 const formatGroupDate = (value) => new Intl.DateTimeFormat('es-AR', {
     weekday: 'short',
@@ -245,7 +182,7 @@ const applySearch = () => {
 onMounted(() => {
     const storedGrouping = localStorage.getItem(GROUPING_STORAGE_KEY);
 
-    if (storedGrouping === 'day' || storedGrouping === 'category') {
+    if (storedGrouping === 'day' || storedGrouping === 'category' || (storedGrouping === 'payment_method' && props.showPaymentMethodFilter)) {
         grouping.value = storedGrouping;
         selectedGrouping.value = storedGrouping;
     }
@@ -340,6 +277,10 @@ onMounted(() => {
                     <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
                         <input v-model="selectedGrouping" value="category" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                         <span><span class="block font-medium">Por categoría</span><span class="block text-xs text-slate-500 dark:text-slate-400">Agrupa los movimientos según su categoría.</span></span>
+                    </label>
+                    <label v-if="showPaymentMethodFilter" class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                        <input v-model="selectedGrouping" value="payment_method" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <span><span class="block font-medium">Por medio de pago</span><span class="block text-xs text-slate-500 dark:text-slate-400">Separa efectivo y cada tarjeta de crédito.</span></span>
                     </label>
                 </fieldset>
                 <DialogFooter>

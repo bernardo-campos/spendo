@@ -89,3 +89,32 @@ export const groupTransactions = (transactions, grouping) => {
 
     return groups;
 };
+
+export const plannedPeriodLabel = (period) => {
+    const month = new Intl.DateTimeFormat('es-AR', { month: 'long' })
+        .format(new Date(`${period}-01T00:00:00`));
+
+    return `Planificados en ${month}`;
+};
+
+export const partitionPlannedDayGroups = (groups, today, period) => {
+    const planned = [];
+    const other = [];
+
+    groups.forEach((group) => {
+        if (group.key > today && group.key.slice(0, 7) === period) {
+            planned.push(group);
+        } else {
+            other.push(group);
+        }
+    });
+
+    return {
+        planned,
+        other,
+        totals: planned.reduce((totals, group) => ({
+            ARS: totals.ARS + group.totals.ARS,
+            USD: totals.USD + group.totals.USD,
+        }), { ARS: 0, USD: 0 }),
+    };
+};

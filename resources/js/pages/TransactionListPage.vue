@@ -1,6 +1,6 @@
 <script setup>
 import { ArrowLeft, ChevronDown, Filter, Search, SlidersHorizontal } from '@lucide/vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
     Dialog,
     DialogClose,
@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { transactionMatchesSearch } from '@/utils/transactionSearch';
 import { filterTransactionsByPaymentAndCurrency } from '@/utils/transactionFilters';
-import { groupTransactions } from '@/utils/transactionGrouping';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel } from '@/utils/transactionGrouping';
+import { formatLocalDate } from '@/utils/localDate';
 
 const props = defineProps({
     emptyMessage: {
@@ -25,6 +26,10 @@ const props = defineProps({
     },
     loading: {
         type: Boolean,
+        required: true,
+    },
+    selectedPeriod: {
+        type: String,
         required: true,
     },
     showPaymentMethodFilter: {
@@ -61,6 +66,9 @@ const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
 const GROUPING_STORAGE_KEY = 'spendo:transaction-list-grouping';
 const groupingDialogOpen = ref(false);
 const grouping = ref('day');
+const today = ref(formatLocalDate());
+const plannedExpanded = ref(false);
+let todayRefreshInterval;
 const paymentMethodFilter = ref(['cash', 'credit']);
 const currencyFilter = ref(['ARS', 'USD']);
 const paymentMethodFilterDialogOpen = ref(false);
@@ -111,6 +119,18 @@ const paymentMethodFilterLabel = computed(() => {
 
 const isSearchActive = computed(() => searchQuery.value.trim() !== '');
 const groupedTransactions = computed(() => groupTransactions(filteredTransactions.value, grouping.value));
+const displayBlocks = computed(() => {
+    if (grouping.value !== 'day') {
+        return groupedTransactions.value.map((group) => ({ key: group.key, groups: [group], planned: false }));
+    }
+
+    const { planned, other, totals } = partitionPlannedDayGroups(groupedTransactions.value, today.value, props.selectedPeriod);
+
+    return [
+        ...(planned.length > 0 ? [{ key: `planned-${props.selectedPeriod}`, groups: planned, planned: true, totals }] : []),
+        ...other.map((group) => ({ key: group.key, groups: [group], planned: false })),
+    ];
+});
 
 const formatGroupDate = (value) => new Intl.DateTimeFormat('es-AR', {
     weekday: 'short',
@@ -199,6 +219,10 @@ const applySearch = () => {
 };
 
 onMounted(() => {
+    todayRefreshInterval = window.setInterval(() => {
+        today.value = formatLocalDate();
+    }, 60_000);
+
     const storedGrouping = localStorage.getItem(GROUPING_STORAGE_KEY);
 
     if (storedGrouping === 'day' || storedGrouping === 'category' || (storedGrouping === 'payment_method' && props.showPaymentMethodFilter)) {
@@ -206,6 +230,8 @@ onMounted(() => {
         selectedGrouping.value = storedGrouping;
     }
 });
+
+onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
 </script>
 
 <template>
@@ -237,40 +263,51 @@ onMounted(() => {
             <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
             <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage) }}</p>
             <div v-else class="space-y-5">
-                <section v-for="group in groupedTransactions" :key="group.key">
-                    <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
-                        <span class="flex items-center gap-1 text-sm font-semibold">
-                            <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.key) ? 'rotate-0' : '-rotate-90'" />
-                            {{ grouping === 'day' ? formatGroupDate(group.key) : group.label }}
+                <section v-for="block in displayBlocks" :key="block.key">
+                    <button v-if="block.planned" type="button" class="flex w-full items-baseline justify-between gap-4 rounded-md bg-secondary px-4 py-3 text-left text-sm font-semibold text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500" :aria-expanded="plannedExpanded" @click="plannedExpanded = !plannedExpanded">
+                        <span class="flex items-center gap-1">
+                            <ChevronDown class="size-4 transition-transform duration-200" :class="plannedExpanded ? 'rotate-0' : '-rotate-90'" />
+                            {{ plannedPeriodLabel(selectedPeriod) }}
                         </span>
-                        <span class="flex shrink-0 flex-col text-right text-sm font-semibold tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(group.totals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
+                        <span class="flex shrink-0 flex-col text-right tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(block.totals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
                     </button>
+                    <div v-show="!block.planned || plannedExpanded" class="space-y-5" :class="block.planned ? 'border-b border-dashed border-slate-300 dark:border-slate-600 sm:pb-4' : ''">
+                        <section v-for="(group, groupIndex) in block.groups" :key="group.key">
+                            <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :class="block.planned ? 'text-secondary-foreground/70' : ''" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
+                                <span class="flex items-center gap-1 text-sm font-semibold">
+                                    <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.key) ? 'rotate-0' : '-rotate-90'" />
+                                    {{ grouping === 'day' ? formatGroupDate(group.key) : group.label }}
+                                </span>
+                                <span class="flex shrink-0 flex-col text-right text-sm font-semibold tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(group.totals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
+                            </button>
 
-                    <div class="grid transition-[grid-template-rows] duration-200 ease-out" :class="isGroupExpanded(group.key) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'">
-                        <div class="overflow-hidden">
-                            <div class="mt-0 rounded-none border-b border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 sm:mt-2 sm:rounded-md sm:border sm:border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:sm:border-slate-800" :class="isGroupExpanded(group.key) ? 'opacity-100' : 'opacity-0'">
-                                <ul class="space-y-3">
-                                    <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
-                                        <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
-                                            <div class="min-w-0">
-                                                <p v-if="shouldShowExpenseField(transaction, 'show_category')" class="truncate font-semibold">
-                                                    {{ grouping === 'category' ? formatTransactionDate(transaction.purchase_date) : (transaction.category?.name ?? 'Sin categoría') }}
-                                                </p>
-                                                <p v-if="shouldShowExpenseField(transaction, 'show_tags') && tagNames(transaction)" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</p>
-                                                <p v-if="transaction.place" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.place }}</p>
-                                                <p v-if="shouldShowExpenseField(transaction, 'show_description')" class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
-                                                <p v-if="shouldShowExpenseField(transaction, 'show_notes') && transaction.notes" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.notes }}</p>
-                                                <p v-if="transactionTypeLabel(transaction) || transaction.installment_number" class="text-xs text-slate-500 dark:text-slate-400">
-                                                    <template v-if="transactionTypeLabel(transaction)">{{ transactionTypeLabel(transaction) }}</template>
-                                                    <template v-if="transaction.installment_number"><span v-if="transactionTypeLabel(transaction)"> · </span>Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
-                                                </p>
-                                            </div>
-                                            <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
-                                        </button>
-                                    </li>
-                                </ul>
+                            <div class="grid transition-[grid-template-rows] duration-200 ease-out" :class="isGroupExpanded(group.key) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'">
+                                <div class="overflow-hidden">
+                                    <div class="mt-0 rounded-none border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 sm:mt-2 sm:rounded-md sm:border sm:border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:sm:border-slate-800" :class="[isGroupExpanded(group.key) ? 'opacity-100' : 'opacity-0', block.planned && groupIndex === block.groups.length - 1 ? 'border-b-0' : 'border-b']">
+                                        <ul class="space-y-3">
+                                            <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
+                                                <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
+                                                    <div class="min-w-0">
+                                                        <p v-if="shouldShowExpenseField(transaction, 'show_category')" class="truncate font-semibold">
+                                                            {{ grouping === 'category' ? formatTransactionDate(transaction.purchase_date) : (transaction.category?.name ?? 'Sin categoría') }}
+                                                        </p>
+                                                        <p v-if="shouldShowExpenseField(transaction, 'show_tags') && tagNames(transaction)" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</p>
+                                                        <p v-if="transaction.place" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.place }}</p>
+                                                        <p v-if="shouldShowExpenseField(transaction, 'show_description')" class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
+                                                        <p v-if="shouldShowExpenseField(transaction, 'show_notes') && transaction.notes" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.notes }}</p>
+                                                        <p v-if="transactionTypeLabel(transaction) || transaction.installment_number" class="text-xs text-slate-500 dark:text-slate-400">
+                                                            <template v-if="transactionTypeLabel(transaction)">{{ transactionTypeLabel(transaction) }}</template>
+                                                            <template v-if="transaction.installment_number"><span v-if="transactionTypeLabel(transaction)"> · </span>Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
+                                                        </p>
+                                                    </div>
+                                                    <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </section>
                     </div>
                 </section>
             </div>

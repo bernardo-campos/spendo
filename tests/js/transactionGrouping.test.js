@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { groupTransactions } from '../../resources/js/utils/transactionGrouping.js';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel } from '../../resources/js/utils/transactionGrouping.js';
 
 const transactions = [
     { id: 1, amount: '100.00', currency: 'ARS', purchase_date: '2026-09-03', payment_method: 'credit', card_id: 2, card: { id: 2, name: 'Visa' } },
@@ -34,4 +34,34 @@ test('keeps day and category grouping available', () => {
         { ...transactions[0], category: { id: 1, name: 'Comida' } },
         { ...transactions[1], category: { id: 1, name: 'Comida' } },
     ], 'category')[0].totals, { ARS: 150, USD: 0 });
+});
+
+test('places only future dates in the current month under planned with combined totals', () => {
+    const groups = groupTransactions([
+        { id: 1, amount: '10.00', currency: 'ARS', purchase_date: '2026-10-04' },
+        { id: 2, amount: '20.00', currency: 'ARS', purchase_date: '2026-10-05' },
+        { id: 3, amount: '30.00', currency: 'ARS', purchase_date: '2026-10-06' },
+        { id: 4, amount: '5.00', currency: 'USD', purchase_date: '2026-10-07' },
+        { id: 5, amount: '40.00', currency: 'ARS', purchase_date: '2026-11-01' },
+    ], 'day');
+
+    const { planned, other, totals } = partitionPlannedDayGroups(groups, '2026-10-05', '2026-10');
+
+    assert.deepEqual(planned.map((group) => group.key), ['2026-10-07', '2026-10-06']);
+    assert.deepEqual(other.map((group) => group.key), ['2026-11-01', '2026-10-05', '2026-10-04']);
+    assert.deepEqual(totals, { ARS: 30, USD: 5 });
+});
+
+test('groups every day of a future selected period as planned and names its month', () => {
+    const groups = groupTransactions([
+        { id: 1, amount: '40.00', currency: 'ARS', purchase_date: '2026-11-01' },
+        { id: 2, amount: '15.00', currency: 'USD', purchase_date: '2026-11-20' },
+    ], 'day');
+
+    const { planned, other, totals } = partitionPlannedDayGroups(groups, '2026-10-05', '2026-11');
+
+    assert.deepEqual(planned.map((group) => group.key), ['2026-11-20', '2026-11-01']);
+    assert.deepEqual(other, []);
+    assert.deepEqual(totals, { ARS: 40, USD: 15 });
+    assert.equal(plannedPeriodLabel('2026-11'), 'Planificados en noviembre');
 });

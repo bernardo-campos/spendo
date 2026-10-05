@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { transactionMatchesSearch } from '@/utils/transactionSearch';
+import { filterTransactionsByPaymentAndCurrency } from '@/utils/transactionFilters';
 import { groupTransactions } from '@/utils/transactionGrouping';
 
 const props = defineProps({
@@ -60,20 +61,22 @@ const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
 const GROUPING_STORAGE_KEY = 'spendo:transaction-list-grouping';
 const groupingDialogOpen = ref(false);
 const grouping = ref('day');
-const paymentMethodFilter = ref('all');
+const paymentMethodFilter = ref(['cash', 'credit']);
+const currencyFilter = ref(['ARS', 'USD']);
 const paymentMethodFilterDialogOpen = ref(false);
 const searchDialogOpen = ref(false);
 const searchQuery = ref('');
 const searchFields = ref(['amount', 'category', 'description', 'place', 'tags', 'notes']);
 const selectedGrouping = ref('day');
-const selectedPaymentMethodFilter = ref('all');
+const selectedPaymentMethodFilter = ref([...paymentMethodFilter.value]);
+const selectedCurrencyFilter = ref([...currencyFilter.value]);
 const selectedSearchFields = ref([...searchFields.value]);
 const selectedSearchQuery = ref('');
 
 const filteredTransactions = computed(() => {
-    const paymentMethodFilteredTransactions = !props.showPaymentMethodFilter || paymentMethodFilter.value === 'all'
+    const paymentMethodFilteredTransactions = !props.showPaymentMethodFilter
         ? props.transactions
-        : props.transactions.filter((transaction) => transaction.payment_method === paymentMethodFilter.value);
+        : filterTransactionsByPaymentAndCurrency(props.transactions, paymentMethodFilter.value, currencyFilter.value);
 
     if (searchQuery.value.trim() === '') {
         return paymentMethodFilteredTransactions;
@@ -87,10 +90,24 @@ const filteredTransactions = computed(() => {
     ));
 });
 
-const paymentMethodFilterLabel = computed(() => ({
-    cash: 'Efectivo',
-    credit: 'Crédito',
-}[paymentMethodFilter.value] ?? 'Ambos'));
+const isFilterActive = computed(() => paymentMethodFilter.value.length !== 2 || currencyFilter.value.length !== 2);
+const paymentMethodFilterLabel = computed(() => {
+    const labels = [];
+
+    if (paymentMethodFilter.value.length === 0) {
+        labels.push('Sin medio de pago');
+    } else if (paymentMethodFilter.value.length === 1) {
+        labels.push(paymentMethodFilter.value[0] === 'cash' ? 'Efectivo' : 'Crédito');
+    }
+
+    if (currencyFilter.value.length === 0) {
+        labels.push('Sin moneda');
+    } else if (currencyFilter.value.length === 1) {
+        labels.push(currencyFilter.value[0] === 'ARS' ? 'Pesos' : 'Dólares');
+    }
+
+    return labels.join(' · ');
+});
 
 const isSearchActive = computed(() => searchQuery.value.trim() !== '');
 const groupedTransactions = computed(() => groupTransactions(filteredTransactions.value, grouping.value));
@@ -158,12 +175,14 @@ const applyGrouping = () => {
 };
 
 const openPaymentMethodFilterDialog = () => {
-    selectedPaymentMethodFilter.value = paymentMethodFilter.value;
+    selectedPaymentMethodFilter.value = [...paymentMethodFilter.value];
+    selectedCurrencyFilter.value = [...currencyFilter.value];
     paymentMethodFilterDialogOpen.value = true;
 };
 
 const applyPaymentMethodFilter = () => {
-    paymentMethodFilter.value = selectedPaymentMethodFilter.value;
+    paymentMethodFilter.value = [...selectedPaymentMethodFilter.value];
+    currencyFilter.value = [...selectedCurrencyFilter.value];
     paymentMethodFilterDialogOpen.value = false;
 };
 
@@ -199,9 +218,9 @@ onMounted(() => {
                 <h2 class="text-base font-semibold">Listado de {{ title.toLowerCase() }}</h2>
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <button v-if="showPaymentMethodFilter" type="button" class="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2" :class="paymentMethodFilter === 'all' ? 'border-slate-300 text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500' : 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 focus-visible:ring-amber-500 dark:border-amber-400 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950 dark:focus-visible:ring-amber-400'" :aria-label="paymentMethodFilter === 'all' ? 'Filtrar movimientos' : `Filtro activo: ${paymentMethodFilterLabel}`" :title="paymentMethodFilter === 'all' ? 'Filtrar movimientos' : `Filtro activo: ${paymentMethodFilterLabel}`" @click="openPaymentMethodFilterDialog">
+                <button v-if="showPaymentMethodFilter" type="button" class="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2" :class="isFilterActive ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 focus-visible:ring-amber-500 dark:border-amber-400 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950 dark:focus-visible:ring-amber-400' : 'border-slate-300 text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500'" :aria-label="isFilterActive ? `Filtro activo: ${paymentMethodFilterLabel}` : 'Filtrar movimientos'" :title="isFilterActive ? `Filtro activo: ${paymentMethodFilterLabel}` : 'Filtrar movimientos'" @click="openPaymentMethodFilterDialog">
                     <Filter class="size-4" />
-                    <span class="hidden sm:inline">{{ paymentMethodFilter === 'all' ? 'Filtrar' : `Filtro: ${paymentMethodFilterLabel}` }}</span>
+                    <span class="hidden sm:inline">{{ isFilterActive ? `Filtro: ${paymentMethodFilterLabel}` : 'Filtrar' }}</span>
                 </button>
                 <button v-if="showPaymentMethodFilter" type="button" class="inline-flex items-center gap-2 rounded-md border px-3 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2" :class="isSearchActive ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 focus-visible:ring-amber-500 dark:border-amber-400 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-950 dark:focus-visible:ring-amber-400' : 'border-slate-300 text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500'" :aria-label="isSearchActive ? `Búsqueda activa: ${searchQuery}` : 'Buscar movimientos'" :title="isSearchActive ? `Búsqueda activa: ${searchQuery}` : 'Buscar movimientos'" @click="openSearchDialog">
                     <Search class="size-4" />
@@ -216,7 +235,7 @@ onMounted(() => {
 
         <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
             <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (paymentMethodFilter === 'all' ? emptyMessage : 'No hay egresos para este filtro.') }}</p>
+            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage) }}</p>
             <div v-else class="space-y-5">
                 <section v-for="group in groupedTransactions" :key="group.key">
                     <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
@@ -296,20 +315,31 @@ onMounted(() => {
                     <DialogTitle>Filtrar movimientos</DialogTitle>
                     <DialogDescription>Elegí qué movimientos querés ver en el listado de egresos.</DialogDescription>
                 </DialogHeader>
-                <fieldset class="grid gap-2">
-                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                        <input v-model="selectedPaymentMethodFilter" value="all" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
-                        <span><span class="block font-medium">Ambos</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra movimientos en efectivo y crédito.</span></span>
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                        <input v-model="selectedPaymentMethodFilter" value="cash" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
-                        <span><span class="block font-medium">Efectivo</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra solamente movimientos pagados en efectivo.</span></span>
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                        <input v-model="selectedPaymentMethodFilter" value="credit" type="radio" class="size-4 border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
-                        <span><span class="block font-medium">Crédito</span><span class="block text-xs text-slate-500 dark:text-slate-400">Muestra solamente movimientos pagados con tarjeta de crédito.</span></span>
-                    </label>
-                </fieldset>
+                <div class="grid gap-4">
+                    <fieldset class="grid gap-2">
+                        <legend class="mb-2 text-sm font-medium">Medio de pago</legend>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                            <input v-model="selectedPaymentMethodFilter" value="cash" type="checkbox" class="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                            <span class="font-medium">Efectivo</span>
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                            <input v-model="selectedPaymentMethodFilter" value="credit" type="checkbox" class="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                            <span class="font-medium">Crédito</span>
+                        </label>
+                    </fieldset>
+                    <hr class="border-slate-200 dark:border-slate-700">
+                    <fieldset class="grid gap-2">
+                        <legend class="mb-2 text-sm font-medium">Moneda</legend>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                            <input v-model="selectedCurrencyFilter" value="ARS" type="checkbox" class="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                            <span class="font-medium">Pesos</span>
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                            <input v-model="selectedCurrencyFilter" value="USD" type="checkbox" class="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                            <span class="font-medium">Dólares</span>
+                        </label>
+                    </fieldset>
+                </div>
                 <DialogFooter>
                     <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">Cancelar</button></DialogClose>
                     <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="applyPaymentMethodFilter">Aplicar</button>

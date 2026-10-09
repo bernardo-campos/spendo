@@ -70,7 +70,9 @@ export const groupTransactions = (transactions, grouping) => {
             };
 
             const currency = ['ARS', 'USD'].includes(transaction.currency) ? transaction.currency : 'ARS';
-            group.totals[currency] += Number.parseFloat(transaction.amount ?? 0) || 0;
+            if (!transaction.is_approximate) {
+                group.totals[currency] += Number.parseFloat(transaction.amount ?? 0) || 0;
+            }
             group.transactions.push(transaction);
             transactionsByGroup.set(groupIdentity.key, group);
         });

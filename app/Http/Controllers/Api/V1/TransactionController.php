@@ -49,6 +49,7 @@ class TransactionController extends Controller
                     ->orWhere(function (Builder $query) use ($periodStart, $periodEnd): void {
                         $query
                             ->where('type', 'expense')
+                            ->whereDoesntHave('recurringExpenseOccurrence')
                             ->where(function (Builder $query) use ($periodStart, $periodEnd): void {
                                 $query
                                     ->where(function (Builder $query) use ($periodStart, $periodEnd): void {

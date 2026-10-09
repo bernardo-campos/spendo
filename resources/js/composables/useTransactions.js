@@ -3,7 +3,7 @@ import { offlineClient } from '../services/offlineClient';
 
 const CURRENCIES = ['ARS', 'USD'];
 
-export const useTransactions = (selectedPeriod) => {
+export const useTransactions = (selectedPeriod, recurringPreview = ref([])) => {
     const transactions = ref([]);
     const transactionsLoading = ref(false);
     const loadedTransactionsPeriod = ref(null);
@@ -23,7 +23,7 @@ export const useTransactions = (selectedPeriod) => {
         .filter((transaction) => transaction.type === 'income')
         .filter((transaction) => isInSelectedPeriod(transaction.purchase_date)));
 
-    const expenseTransactions = computed(() => transactions.value
+    const recordedExpenses = computed(() => transactions.value
         .filter((transaction) => transaction.type === 'expense')
         .flatMap((transaction) => {
             const installments = transaction.installment_plan?.installments ?? [];
@@ -66,6 +66,30 @@ export const useTransactions = (selectedPeriod) => {
             }];
         }));
 
+    const recurringExpenses = computed(() => recurringPreview.value
+        .filter((item) => item.status !== 'skipped')
+        .map((item) => ({
+            id: `recurring-${item.id}-${selectedPeriod.value}`,
+            recurring_expense_id: item.id,
+            recurring_status: item.status,
+            is_unconfirmed_recurring: item.amount_type === 'variable' && item.status === 'pending',
+            is_approximate: item.amount_type === 'variable' && item.status === 'pending',
+            transaction_id: item.transaction_id,
+            type: 'expense',
+            description: item.description,
+            place: item.place,
+            amount: item.amount,
+            currency: item.currency,
+            purchase_date: item.charge_date,
+            payment_method: item.payment_method,
+            card_id: item.card?.id,
+            card: item.card,
+            category: item.category,
+            tags: [],
+        })));
+
+    const expenseTransactions = computed(() => [...recordedExpenses.value, ...recurringExpenses.value]);
+
     const dashboardRecentTransactions = computed(() => {
         const combined = [...incomeTransactions.value, ...expenseTransactions.value];
         const exchanges = new Map();
@@ -87,7 +111,7 @@ export const useTransactions = (selectedPeriod) => {
 
     const incomeTotals = computed(() => totalsByCurrency(incomeTransactions.value));
 
-    const expenseTotals = computed(() => totalsByCurrency(expenseTransactions.value));
+    const expenseTotals = computed(() => totalsByCurrency(expenseTransactions.value.filter((item) => !item.is_approximate)));
 
     const loadTransactions = async ({ force = false } = {}) => {
         const period = selectedPeriod.value;

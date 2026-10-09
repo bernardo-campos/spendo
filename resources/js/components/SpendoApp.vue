@@ -18,6 +18,7 @@ import DashboardPage from '../pages/DashboardPage.vue';
 import TagsPage from '../pages/TagsPage.vue';
 import TransactionFormPage from '../pages/TransactionFormPage.vue';
 import TransactionListPage from '../pages/TransactionListPage.vue';
+import RecurringExpensesPage from '../pages/RecurringExpensesPage.vue';
 import VisualizationPage from '../pages/VisualizationPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
@@ -52,6 +53,12 @@ const savingVisualizationPreferences = ref(false);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
 const places = ref([]);
+const recurringRules = ref([]);
+const recurringPreview = ref([]);
+const recurringBusy = ref(false);
+const recurringOffline = ref(false);
+const recurringPage = ref(null);
+const recurringPendingCount = computed(() => recurringPreview.value.filter((item) => item.amount_type === 'variable' && item.status === 'pending' && item.charge_date <= formatLocalDate()).length);
 const { errorMessage, loading, runWithLoading, successMessage } = useAsyncAction();
 const { isDarkMode, toggleColorMode } = useColorMode();
 
@@ -74,7 +81,7 @@ const {
     invalidateTransactions,
     loadTransactions,
     transactionsLoading,
-} = useTransactions(selectedPeriod);
+} = useTransactions(selectedPeriod, recurringPreview);
 
 const userInitials = computed(() => userName
     .split(' ')
@@ -339,6 +346,75 @@ const loadPlaces = async () => {
     places.value = response.data;
 };
 
+const loadRecurringPreview = async () => {
+    const period = selectedPeriod.value;
+    recurringPreview.value = [];
+    try {
+        const response = await offlineClient.get('/recurring-expenses/preview', { params: { period }, fresh: true });
+        if (selectedPeriod.value === period) {
+            recurringPreview.value = response.data;
+            recurringOffline.value = false;
+        }
+    } catch (error) {
+        if (!error.offlineUnavailable) {
+            throw error;
+        }
+        recurringPreview.value = [];
+        recurringOffline.value = true;
+    }
+};
+
+const loadRecurringRules = async () => {
+    try {
+        const response = await offlineClient.get('/recurring-expenses', { fresh: true });
+        recurringRules.value = response.data;
+        recurringOffline.value = false;
+    } catch (error) {
+        if (!error.offlineUnavailable) {
+            throw error;
+        }
+        recurringRules.value = [];
+        recurringOffline.value = true;
+    }
+};
+
+const saveRecurringRule = async ({ id, payload }) => {
+    recurringBusy.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+        const url = id ? `/recurring-expenses/${id}` : '/recurring-expenses';
+        await window.axios.request({ method: id ? 'put' : 'post', url, data: payload });
+        await Promise.all([loadRecurringRules(), loadRecurringPreview()]);
+        recurringPage.value?.reset();
+        successMessage.value = id ? 'Recurrencia actualizada.' : 'Recurrencia creada.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la recurrencia.';
+    } finally {
+        recurringBusy.value = false;
+    }
+};
+
+const saveRecurringOccurrence = async ({ id, status, amount, description }) => {
+    recurringBusy.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+        await window.axios.put(`/recurring-expenses/${id}/decisions`, {
+            period: selectedPeriod.value,
+            status,
+            ...(status === 'confirmed' ? { amount, description } : {}),
+        });
+        invalidateTransactions();
+        await Promise.all([loadRecurringPreview(), loadTransactions({ force: true })]);
+        successMessage.value = status === 'confirmed' ? 'Gasto de este mes guardado.' : 'Gasto quitado de este mes.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible registrar la decisión.';
+    } finally {
+        recurringBusy.value = false;
+    }
+};
+
 const openTransactionEdit = async (listedTransaction) => {
     if (listedTransaction.exchange_id) {
         await openExchangeEdit(listedTransaction.exchange_id, listedTransaction.type === 'income' ? 'income-list' : 'expense-list');
@@ -460,6 +536,21 @@ watch(
     async (screen) => {
         if (screen === 'dashboard' || screen === 'income-list' || screen === 'expense-list') {
             await runWithLoading(loadTransactions, 'No fue posible cargar las transacciones.');
+            if (screen === 'expense-list' || screen === 'dashboard') {
+                await runWithLoading(loadRecurringPreview, 'No fue posible cargar los gastos recurrentes.');
+            }
+            return;
+        }
+
+        if (screen === 'recurring-expenses') {
+            await runWithLoading(() => Promise.all([
+                loadRecurringRules(), loadRecurringPreview(), loadCards(), loadCategories(),
+                loadPlaces().catch((error) => {
+                    if (!error.offlineUnavailable) {
+                        throw error;
+                    }
+                }),
+            ]), 'No fue posible cargar las recurrencias.');
             return;
         }
 
@@ -492,6 +583,9 @@ watch(
     () => selectedPeriod.value,
     async () => {
         await runWithLoading(loadTransactions, 'No fue posible cargar las transacciones.');
+        if (['dashboard', 'expense-list', 'recurring-expenses'].includes(activeScreen.value)) {
+            await runWithLoading(loadRecurringPreview, 'No fue posible cargar los gastos recurrentes.');
+        }
     }
 );
 
@@ -500,6 +594,12 @@ watch(() => offlineSyncState.value.status, async (status) => {
         && ['dashboard', 'income-list', 'expense-list'].includes(activeScreen.value)) {
         invalidateTransactions();
         await runWithLoading(() => loadTransactions({ force: true }), 'No fue posible actualizar las transacciones.');
+        if (['dashboard', 'expense-list'].includes(activeScreen.value)) {
+            await runWithLoading(loadRecurringPreview, 'No fue posible actualizar los gastos recurrentes.');
+        }
+    }
+    if (status === 'synced' && activeScreen.value === 'recurring-expenses') {
+        await runWithLoading(() => Promise.all([loadRecurringRules(), loadRecurringPreview()]), 'No fue posible actualizar las recurrencias.');
     }
 });
 
@@ -682,9 +782,11 @@ const deleteTransaction = async () => {
 
         <TransactionListPage v-if="activeScreen === 'income-list'" :collapsed-dates="collapsedDatesByList.income" empty-message="No hay ingresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :selected-period="selectedPeriod" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('income', $event)" />
 
-        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :display-preferences="expenseListDisplayPreferences" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :selected-period="selectedPeriod" :show-payment-method-filter="true" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
+        <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :display-preferences="expenseListDisplayPreferences" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :recurring-busy="recurringBusy" :selected-period="selectedPeriod" :show-payment-method-filter="true" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @save-recurring="saveRecurringOccurrence" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
-        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" @create-expense="openTransactionForm('expense')" @create-exchange="openExchangeForm" @navigate="setActiveScreenFromMenu" />
+        <RecurringExpensesPage v-if="activeScreen === 'recurring-expenses'" ref="recurringPage" :rules="recurringRules" :cards="cards" :categories="categories" :places="places" :selected-period="selectedPeriod" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :busy="recurringBusy" :offline="recurringOffline" @save="saveRecurringRule" @back="setActiveScreenFromMenu('expense-list')" />
+
+        <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" :recurring-pending-count="recurringPendingCount" @create-expense="openTransactionForm('expense')" @create-exchange="openExchangeForm" @navigate="setActiveScreenFromMenu" />
 
         <TransactionFormPage v-if="activeScreen === 'transaction-form' && form.type !== 'exchange'" :cards="cards" :categories="categories" :category-options="categoryOptions" :currencies="CURRENCY_OPTIONS" :deleting="deletingTransaction" :editing="editingTransactionId !== null" :first-installment-payment-date="firstInstallmentPaymentDate" :first-installment-payment-date-is-estimated="firstInstallmentPaymentDateIsEstimated" :forced-transaction-type="forcedTransactionType" :form="form" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :installment-preview="installmentPreview" :is-credit-payment="isCreditPayment" :payment-methods="PAYMENT_METHODS" :places="places" :saving="savingTransaction" :show-installments="showInstallments" :tags="tags" :title="transactionFormTitle" @back="returnToTransactionList" @delete="deleteTransaction" @submit="submitTransaction" />
 

@@ -6,6 +6,7 @@ export const useNavigation = ({ form }) => {
         dashboard: '/app',
         'income-list': '/app/incomes',
         'expense-list': '/app/expenses',
+        'recurring-expenses': '/app/recurring-expenses',
         categories: '/app/categories',
         tags: '/app/tags',
         cards: '/app/cards',

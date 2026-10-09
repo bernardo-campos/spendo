@@ -4,6 +4,7 @@ import {
     CreditCard,
     FolderTree,
     ReceiptText,
+    Repeat2,
     SlidersHorizontal,
     Tags,
     WalletCards,
@@ -74,6 +75,10 @@ const visibleCurrencyTotals = (totals) => Object.entries(totals)
                 Egresos
                 <span v-if="transactionsLoading" class="ml-auto text-xs italic text-muted-foreground">Cargando...</span>
                 <span v-else class="ml-auto flex flex-col text-right text-xs tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(expenseTotals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'recurring-expenses' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'recurring-expenses')">
+                <Repeat2 class="size-4" />
+                Gastos recurrentes
             </button>
 
             <p class="px-3 pb-2 pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuración</p>

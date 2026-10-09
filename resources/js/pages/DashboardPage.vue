@@ -22,6 +22,7 @@ defineProps({
         type: Array,
         required: true,
     },
+    recurringPendingCount: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['create-expense', 'create-exchange', 'navigate']);
@@ -31,6 +32,9 @@ const visibleCurrencyTotals = (totals) => Object.entries(totals)
 </script>
 
 <template>
+    <button v-if="recurringPendingCount > 0" type="button" class="mb-4 w-full rounded-lg border border-amber-300 bg-amber-50 p-4 text-left text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60" @click="emit('navigate', 'expense-list')">
+        Tenés {{ recurringPendingCount }} importe{{ recurringPendingCount === 1 ? '' : 's' }} sin confirmar este mes. Ver egresos →
+    </button>
     <section class="grid gap-4 md:grid-cols-3">
         <component :is="card.target ? 'button' : 'article'" v-for="card in cardsSummary" :key="card.title" :type="card.target ? 'button' : undefined" class="rounded-lg border border-slate-200 bg-white p-4 text-left dark:border-slate-800 dark:bg-slate-900" :class="card.target ? 'cursor-pointer transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800' : ''" @click="card.target ? emit('navigate', card.target) : undefined">
             <h2 class="flex items-center gap-1 text-sm font-medium text-slate-500 dark:text-slate-400">

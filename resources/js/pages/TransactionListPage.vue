@@ -59,9 +59,10 @@ const props = defineProps({
             show_notes: false,
         }),
     },
+    recurringBusy: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates']);
+const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates', 'save-recurring']);
 
 const GROUPING_STORAGE_KEY = 'spendo:transaction-list-grouping';
 const groupingDialogOpen = ref(false);
@@ -80,17 +81,53 @@ const selectedPaymentMethodFilter = ref([...paymentMethodFilter.value]);
 const selectedCurrencyFilter = ref([...currencyFilter.value]);
 const selectedSearchFields = ref([...searchFields.value]);
 const selectedSearchQuery = ref('');
+const unconfirmedOnly = ref(false);
+const recurringDialogOpen = ref(false);
+const editingRecurring = ref(null);
+const recurringAmount = ref('');
+const recurringDescription = ref('');
+const confirmingRecurringDelete = ref(false);
+const unconfirmedCount = computed(() => props.transactions.filter((item) => item.is_unconfirmed_recurring).length);
+const openTransaction = (transaction) => {
+    if (!transaction.recurring_expense_id) {
+        emit('edit', transaction);
+        return;
+    }
+
+    editingRecurring.value = transaction;
+    recurringAmount.value = transaction.amount ?? '';
+    recurringDescription.value = transaction.description;
+    confirmingRecurringDelete.value = false;
+    recurringDialogOpen.value = true;
+};
+const saveRecurring = (status) => {
+    if (status === 'confirmed' && !(Number(recurringAmount.value) > 0)) {
+        return;
+    }
+
+    emit('save-recurring', {
+        id: editingRecurring.value.recurring_expense_id,
+        status,
+        amount: status === 'confirmed' ? recurringAmount.value : null,
+        description: recurringDescription.value,
+    });
+    recurringDialogOpen.value = false;
+};
 
 const filteredTransactions = computed(() => {
     const paymentMethodFilteredTransactions = !props.showPaymentMethodFilter
         ? props.transactions
         : filterTransactionsByPaymentAndCurrency(props.transactions, paymentMethodFilter.value, currencyFilter.value);
 
+    const matchingTransactions = unconfirmedOnly.value
+        ? paymentMethodFilteredTransactions.filter((transaction) => transaction.is_unconfirmed_recurring)
+        : paymentMethodFilteredTransactions;
+
     if (searchQuery.value.trim() === '') {
-        return paymentMethodFilteredTransactions;
+        return matchingTransactions;
     }
 
-    return paymentMethodFilteredTransactions.filter((transaction) => transactionMatchesSearch(
+    return matchingTransactions.filter((transaction) => transactionMatchesSearch(
         transaction,
         searchQuery.value,
         searchFields.value,
@@ -259,9 +296,15 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
             </div>
         </div>
 
+        <div v-if="showPaymentMethodFilter && (unconfirmedCount > 0 || unconfirmedOnly)" class="mx-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-0 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="status">
+            <span v-if="unconfirmedCount > 0">Tiene importes sin confirmar ({{ unconfirmedCount }}).</span>
+            <span v-else>Todos los importes están confirmados.</span>
+            <button type="button" class="rounded-md border border-amber-500 px-3 py-1.5 font-medium hover:bg-amber-100 dark:hover:bg-amber-900" :aria-pressed="unconfirmedOnly" @click="unconfirmedOnly = !unconfirmedOnly; plannedExpanded = true">{{ unconfirmedOnly ? 'Quitar filtro' : 'Ver sin confirmar' }}</button>
+        </div>
+
         <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
             <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage) }}</p>
+            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ unconfirmedOnly ? 'No hay importes sin confirmar para estos filtros.' : (isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage)) }}</p>
             <div v-else class="space-y-5">
                 <section v-for="block in displayBlocks" :key="block.key">
                     <button v-if="block.planned" type="button" class="flex w-full items-baseline justify-between gap-4 rounded-md bg-secondary px-4 py-3 text-left text-sm font-semibold text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500" :aria-expanded="plannedExpanded" @click="plannedExpanded = !plannedExpanded">
@@ -286,7 +329,7 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                                     <div class="mt-0 rounded-none border-slate-200 bg-white px-3 py-3 transition-opacity duration-200 sm:mt-2 sm:rounded-md sm:border sm:border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:sm:border-slate-800" :class="[isGroupExpanded(group.key) ? 'opacity-100' : 'opacity-0', block.planned && groupIndex === block.groups.length - 1 ? 'border-b-0' : 'border-b']">
                                         <ul class="space-y-3">
                                             <li v-for="transaction in group.transactions" :key="transaction.id" class="text-sm">
-                                                <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="emit('edit', transaction)">
+                                                <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-sm text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500" @click="openTransaction(transaction)">
                                                     <div class="min-w-0">
                                                         <p v-if="shouldShowExpenseField(transaction, 'show_category')" class="truncate font-semibold">
                                                             {{ grouping === 'category' ? formatTransactionDate(transaction.purchase_date) : (transaction.category?.name ?? 'Sin categoría') }}
@@ -300,7 +343,7 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                                                             <template v-if="transaction.installment_number"><span v-if="transactionTypeLabel(transaction)"> · </span>Cuota {{ transaction.installment_number }}/{{ transaction.total_installments }}</template>
                                                         </p>
                                                     </div>
-                                                    <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
+                                                    <span class="self-start whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{{ transaction.is_approximate ? '≈ ' : '' }}{{ transaction.amount === null ? `${transaction.currency === 'USD' ? 'USD$' : 'AR$'} —` : formatCurrencyAmount(transaction.currency, transaction.amount) }}</span>
                                                 </button>
                                             </li>
                                         </ul>
@@ -318,6 +361,32 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                 </button>
             </div>
         </div>
+
+        <Dialog v-model:open="recurringDialogOpen">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{{ editingRecurring?.is_unconfirmed_recurring ? 'Confirmar importe' : 'Editar gasto de este mes' }}</DialogTitle>
+                    <DialogDescription>El cambio afecta solo a {{ selectedPeriod }}. La regla mensual conserva su importe.</DialogDescription>
+                </DialogHeader>
+                <form class="grid gap-4" @submit.prevent="saveRecurring('confirmed')">
+                    <label class="grid gap-1 text-sm font-medium">Descripción
+                        <input v-model="recurringDescription" required maxlength="255" class="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                    </label>
+                    <label class="grid gap-1 text-sm font-medium">Importe ({{ editingRecurring?.currency }})
+                        <input v-model="recurringAmount" required type="number" min="0.01" step="0.01" class="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                    </label>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <button v-if="!confirmingRecurringDelete" type="button" class="mr-auto rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:text-red-300" :disabled="recurringBusy" @click="confirmingRecurringDelete = true">Eliminar este mes</button>
+                        <template v-else>
+                            <span class="mr-auto self-center text-xs text-red-700">¿Quitar solo este mes?</span>
+                            <button type="button" class="rounded-md border border-red-400 px-3 py-2 text-sm text-red-700" :disabled="recurringBusy" @click="saveRecurring('skipped')">Sí, quitar</button>
+                        </template>
+                        <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Cancelar</button></DialogClose>
+                        <button type="submit" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900" :disabled="recurringBusy">Guardar</button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
 
         <Dialog v-model:open="groupingDialogOpen">
             <DialogContent class="sm:max-w-md">

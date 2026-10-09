@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\CardController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CurrencyExchangeController;
 use App\Http\Controllers\Api\V1\InstallmentPlanController;
+use App\Http\Controllers\Api\V1\RecurringExpenseController;
 use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
@@ -34,6 +35,10 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::get('currency-exchanges/latest', [CurrencyExchangeController::class, 'latest']);
     Route::apiResource('currency-exchanges', CurrencyExchangeController::class)->except('index');
     Route::apiResource('transactions', TransactionController::class);
+    Route::get('recurring-expenses/preview', [RecurringExpenseController::class, 'preview']);
+    Route::post('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'decide']);
+    Route::put('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'saveOccurrence']);
+    Route::apiResource('recurring-expenses', RecurringExpenseController::class)->only(['index', 'store', 'update']);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
     Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);
     Route::put('visualization-preferences', [VisualizationPreferenceController::class, 'update']);

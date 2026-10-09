@@ -81,4 +81,9 @@ class Transaction extends Model
     {
         return $this->hasOne(InstallmentPlan::class);
     }
+
+    public function recurringExpenseOccurrence(): HasOne
+    {
+        return $this->hasOne(RecurringExpenseOccurrence::class);
+    }
 }

@@ -8,6 +8,7 @@ import { useNavigation } from '../composables/useNavigation';
 import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
 import { offlineClient } from '../services/offlineClient';
+import { submitLogout as submitLogoutForm } from '../services/logout';
 import { currentLocalPeriod, formatLocalDate } from '../utils/localDate';
 import { exchangeReferenceAmounts, suggestedExchangeAmount } from '../utils/exchangeSuggestion';
 import AdminLayout from './admin/AdminLayout.vue';
@@ -510,10 +511,7 @@ const retryOfflineSync = () => {
     void offlineClient.retry();
 };
 
-const clearOfflineData = () => {
-    void offlineClient.clear();
-    navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_PRIVATE_OFFLINE_DATA' });
-};
+const submitLogout = (event) => submitLogoutForm(event, offlineClient);
 
 const onDocumentPointerDown = (event) => {
     if (!userMenuOpen.value) {
@@ -773,7 +771,7 @@ const deleteTransaction = async () => {
                 <button type="button" class="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent sm:hidden" @click="toggleColorMode">
                     {{ isDarkMode ? 'Usar tema claro' : 'Usar tema oscuro' }}
                 </button>
-                <form method="POST" action="/logout" class="w-full" @submit="clearOfflineData">
+                <form method="POST" action="/logout" class="w-full" @submit="submitLogout">
                     <input type="hidden" name="_token" :value="csrfToken">
                     <button type="submit" class="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">Cerrar sesión</button>
                 </form>

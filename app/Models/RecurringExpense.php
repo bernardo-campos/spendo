@@ -17,12 +17,14 @@ class RecurringExpense extends Model
     protected $attributes = [
         'currency' => 'ARS',
         'is_active' => true,
+        'number_occurrences_in_notes' => false,
     ];
 
     protected $fillable = [
         'user_id', 'category_id', 'card_id', 'description', 'place',
         'payment_method', 'currency', 'amount_type', 'amount',
         'day_of_month', 'starts_on', 'ends_on', 'is_active', 'series_key',
+        'notes', 'number_occurrences_in_notes',
     ];
 
     protected static function booted(): void
@@ -40,6 +42,7 @@ class RecurringExpense extends Model
             'starts_on' => 'date',
             'ends_on' => 'date',
             'is_active' => 'boolean',
+            'number_occurrences_in_notes' => 'boolean',
         ];
     }
 

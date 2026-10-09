@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\PaymentMethodType;
 use App\Enums\TransactionCurrency;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -38,6 +39,8 @@ class StoreRecurringExpenseRequest extends FormRequest
             'day_of_month' => ['required', 'integer', 'between:1,31'],
             'starts_on' => ['required', 'date_format:Y-m-d'],
             'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+            'notes' => ['nullable', 'string', 'max:4800'],
+            'number_occurrences_in_notes' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -51,6 +54,26 @@ class StoreRecurringExpenseRequest extends FormRequest
 
             if ($this->input('payment_method') !== PaymentMethodType::Credit->value && $this->filled('card_id')) {
                 $validator->errors()->add('card_id', 'La tarjeta solo corresponde a pagos con crédito.');
+            }
+
+            if ($this->boolean('number_occurrences_in_notes') && ! $this->filled('ends_on')) {
+                $validator->errors()->add('ends_on', 'Indique una fecha de fin para numerar las repeticiones.');
+            }
+
+            if ($this->filled('ends_on') && $validator->errors()->isEmpty()) {
+                $start = CarbonImmutable::parse($this->input('starts_on'));
+                $end = CarbonImmutable::parse($this->input('ends_on'));
+                $firstMonth = $start->startOfMonth();
+                $chargeDate = $firstMonth->setDay(min((int) $this->input('day_of_month'), $firstMonth->daysInMonth));
+
+                if ($chargeDate->lt($start)) {
+                    $nextMonth = $firstMonth->addMonth();
+                    $chargeDate = $nextMonth->setDay(min((int) $this->input('day_of_month'), $nextMonth->daysInMonth));
+                }
+
+                if ($chargeDate->gt($end)) {
+                    $validator->errors()->add('ends_on', 'El rango elegido no contiene ningún cargo mensual.');
+                }
             }
         }];
     }

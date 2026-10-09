@@ -28,6 +28,8 @@ class RecurringExpenseResource extends JsonResource
             'starts_on' => $this->starts_on?->toDateString(),
             'ends_on' => $this->ends_on?->toDateString(),
             'is_active' => $this->is_active,
+            'notes' => $this->notes,
+            'number_occurrences_in_notes' => $this->number_occurrences_in_notes,
             'card' => new CardResource($this->whenLoaded('card')),
             'category' => new CategoryResource($this->whenLoaded('category')),
         ];

@@ -13,6 +13,7 @@ import {
     ComboboxTrigger,
 } from '@/components/ui/combobox';
 import { formatLocalDate } from '../utils/localDate';
+import { recurringExpenseSchedule } from '../utils/recurringExpenseSchedule';
 
 const currencies = [
     { value: 'ARS', label: 'Pesos argentinos (AR$)', symbol: 'AR$' },
@@ -37,6 +38,7 @@ const props = defineProps({
 const emit = defineEmits(['save', 'back']);
 const editingId = ref(null);
 const showForm = ref(false);
+const visiblePreviewLimit = ref(60);
 const amountEditorOpen = ref(false);
 const amountInputRef = ref(null);
 const placeFieldRef = ref(null);
@@ -46,9 +48,18 @@ const emptyForm = () => ({
     description: '', place: '', category_id: '', payment_method: 'cash', card_id: '',
     currency: 'ARS', amount_type: 'fixed', amount: '', day_of_month: Number(formatLocalDate().slice(8, 10)),
     starts_on: `${props.selectedPeriod}-01`, ends_on: '', is_active: true,
+    notes: '', number_occurrences_in_notes: false,
     effective_period: props.selectedPeriod,
 });
 const form = ref(emptyForm());
+const previewRule = computed(() => ({
+    ...form.value,
+    starts_on: editingId.value && form.value.effective_period > String(form.value.starts_on).slice(0, 7)
+        ? `${form.value.effective_period}-01`
+        : form.value.starts_on,
+}));
+const schedulePreview = computed(() => recurringExpenseSchedule(previewRule.value, visiblePreviewLimit.value));
+const formatPreviewDate = (value) => String(value).split('-').reverse().join('/');
 const expenseCategories = computed(() => props.categories.filter((category) => category.scope === 'expense' || category.scope === 'both'));
 const selectedCategory = computed({
     get: () => expenseCategories.value.find((category) => Number(category.id) === Number(form.value.category_id)) ?? null,
@@ -112,10 +123,13 @@ const edit = (rule) => {
         ends_on: rule.ends_on ? String(rule.ends_on).slice(0, 10) : '',
         is_active: rule.is_active,
         effective_period: props.selectedPeriod,
+        notes: rule.notes ?? '',
+        number_occurrences_in_notes: Boolean(rule.number_occurrences_in_notes),
     };
 };
 const reset = () => {
     showForm.value = false;
+    visiblePreviewLimit.value = 60;
     formError.value = '';
     editingId.value = null;
     form.value = emptyForm();
@@ -135,11 +149,21 @@ const submit = () => {
             amount: form.value.amount_type === 'fixed' ? form.value.amount : null,
             place: form.value.place.trim() || null,
             ends_on: form.value.ends_on || null,
+            notes: form.value.notes.trim() || null,
+            number_occurrences_in_notes: Boolean(form.value.ends_on && form.value.number_occurrences_in_notes),
         },
     });
 };
 watch(() => props.selectedPeriod, (period) => {
     form.value.effective_period = period;
+});
+watch(() => form.value.ends_on, (endDate) => {
+    if (!endDate) {
+        form.value.number_occurrences_in_notes = false;
+    }
+});
+watch(() => [form.value.starts_on, form.value.ends_on, form.value.day_of_month, form.value.effective_period], () => {
+    visiblePreviewLimit.value = 60;
 });
 defineExpose({ reset });
 </script>
@@ -194,6 +218,11 @@ defineExpose({ reset });
                 <label class="block space-y-1 text-sm">
                     <span class="font-medium">Descripción</span>
                     <input v-model="form.description" type="text" required maxlength="255" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                </label>
+
+                <label class="block space-y-1 text-sm">
+                    <span class="font-medium">Nota <span class="font-normal text-slate-500 dark:text-slate-400">(opcional)</span></span>
+                    <textarea v-model="form.notes" rows="2" maxlength="4800" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"></textarea>
                 </label>
 
                 <div class="space-y-1 text-sm">
@@ -271,7 +300,7 @@ defineExpose({ reset });
                     </label>
                     <label class="block space-y-1 text-sm">
                         <span class="font-medium">Termina <span class="font-normal text-slate-500 dark:text-slate-400">(opcional)</span></span>
-                        <input v-model="form.ends_on" type="date" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                        <input v-model="form.ends_on" type="date" :min="form.starts_on" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                     </label>
                     <label v-if="editingId" class="block space-y-1 text-sm">
                         <span class="font-medium">Aplicar cambios desde</span>
@@ -279,6 +308,28 @@ defineExpose({ reset });
                     </label>
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Si el mes no tiene ese día, se usará el último día disponible.</p>
+                <div v-if="schedulePreview" class="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold">Vista previa de cargos</h3>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ schedulePreview.total }} {{ schedulePreview.total === 1 ? 'repetición' : 'repeticiones' }}</span>
+                    </div>
+                    <label class="flex items-start gap-2 text-sm" :class="schedulePreview.total === 0 ? 'opacity-50' : ''">
+                        <input v-model="form.number_occurrences_in_notes" type="checkbox" :disabled="schedulePreview.total === 0" class="mt-0.5 size-4 rounded border-slate-300 dark:border-slate-700">
+                        <span>Agregar la numeración a la nota de cada cargo<span v-if="!editingId"> (por ejemplo, 1 de {{ schedulePreview.total }})</span></span>
+                    </label>
+                    <p v-if="editingId && form.number_occurrences_in_notes" class="text-xs text-slate-500 dark:text-slate-400">Al editar una regla, la numeración final conserva los cargos anteriores de la misma serie.</p>
+                    <p v-if="schedulePreview.total === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay fechas de cargo dentro del rango elegido.</p>
+                    <ul v-else class="max-h-64 space-y-2 overflow-y-auto pr-1" aria-label="Cargos previstos">
+                        <li v-for="item in schedulePreview.items" :key="item.date" class="flex flex-wrap items-start justify-between gap-x-3 border-b border-slate-200 pb-2 text-sm last:border-b-0 last:pb-0 dark:border-slate-800">
+                            <div>
+                                <p class="font-medium">{{ formatPreviewDate(item.date) }}</p>
+                                <p v-if="!editingId && item.notes" class="whitespace-pre-line text-xs text-slate-500 dark:text-slate-400">Nota: {{ item.notes }}</p>
+                            </div>
+                            <span class="tabular-nums text-slate-600 dark:text-slate-300">{{ form.amount_type === 'fixed' && form.amount ? formatCurrencyAmount(form.currency, form.amount) : `≈ ${selectedCurrency?.symbol ?? form.currency} —` }}</span>
+                        </li>
+                    </ul>
+                    <button v-if="schedulePreview.hiddenCount > 0" type="button" class="text-left text-xs font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" @click="visiblePreviewLimit += 60">Mostrar 60 cargos más ({{ schedulePreview.hiddenCount }} restantes)</button>
+                </div>
                 <label class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" class="size-4 rounded border-slate-300 dark:border-slate-700"> Recurrencia activa</label>
                 <p v-if="formError" class="text-sm text-red-700 dark:text-red-400" role="alert">{{ formError }}</p>
                 <div class="grid gap-3 sm:grid-cols-2">

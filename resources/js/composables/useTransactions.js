@@ -78,6 +78,7 @@ export const useTransactions = (selectedPeriod, recurringPreview = ref([])) => {
             type: 'expense',
             description: item.description,
             place: item.place,
+            notes: item.notes,
             amount: item.amount,
             currency: item.currency,
             purchase_date: item.charge_date,

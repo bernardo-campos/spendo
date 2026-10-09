@@ -8,6 +8,10 @@ Registrar gastos que se repiten cada mes sin crear transacciones para todos los 
 
 En el menú lateral, **Gastos recurrentes** muestra las reglas vigentes y el botón **Agregar gasto recurrente**. La regla incluye descripción, lugar y categoría opcionales, medio de pago, tarjeta cuando corresponde, moneda, día del cargo, fecha de inicio y fecha de fin opcional. Puede pausarse con **Recurrencia activa**.
 
+Si se indican inicio y fin, el formulario muestra una vista previa de los cargos incluidos en ese rango: fecha de cada cargo, importe fijo o variable y cantidad total de repeticiones. Se pueden desplegar las fechas en bloques de 60. Si el día elegido no existe en un mes, se muestra el último día de ese mes. El rango debe incluir al menos un cargo.
+
+La regla admite una nota opcional. Con fecha de fin se puede activar **Agregar la numeración a la nota de cada cargo**. La nota de cada mes añade una línea como `1 de 10`, `2 de 10`, etc. La numeración cuenta los cargos previstos en el rango, aunque se omita individualmente alguno de esos meses. Si se cambia la regla desde un mes posterior, los números continúan dentro de la misma serie. Sin fecha de fin no se ofrece numeración.
+
 Hay dos tipos de importe:
 
 | Tipo | Comportamiento en Egresos |
@@ -31,7 +35,7 @@ No hay un proceso diario ni una cantidad fija de meses generados por adelantado.
 
 ## Persistencia y cambios de reglas
 
-- `recurring_expenses` guarda la regla: tipo de importe, importe fijo cuando corresponde, moneda, día, vigencia, medio de pago, tarjeta y demás datos del gasto.
+- `recurring_expenses` guarda la regla: tipo de importe, importe fijo cuando corresponde, moneda, día, vigencia, medio de pago, tarjeta, nota y opción de numeración.
 - `recurring_expense_occurrences` guarda únicamente los meses con una decisión individual: `confirmed` o `skipped`. Cada combinación de regla y período es única. Una ocurrencia confirmada puede apuntar a una transacción; una omitida no tiene transacción.
 - Un fijo sin cambios individuales se muestra desde la regla y no necesita una transacción persistida. Editarlo crea o actualiza la transacción de ese mes. Omitirlo guarda la excepción para que no vuelva a aparecer.
 - Confirmar un variable crea o actualiza su transacción. El último importe confirmado se usa solo como sugerencia para los meses siguientes.

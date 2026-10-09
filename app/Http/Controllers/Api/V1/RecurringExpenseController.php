@@ -11,6 +11,7 @@ use App\Models\RecurringExpense;
 use App\Models\RecurringExpenseOccurrence;
 use App\Models\Transaction;
 use App\Services\CardPaymentDateService;
+use App\Services\RecurringExpenseNoteService;
 use App\Services\RecurringExpensePreviewService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class RecurringExpenseController extends Controller
     public function __construct(
         private RecurringExpensePreviewService $previewService,
         private CardPaymentDateService $cardPaymentDateService,
+        private RecurringExpenseNoteService $noteService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -80,6 +82,12 @@ class RecurringExpenseController extends Controller
         $validated['card_id'] = $validated['payment_method'] === 'credit' ? $validated['card_id'] : null;
 
         abort_if($recurringExpense->ends_on !== null && $effectiveMonth->gt($recurringExpense->ends_on), 422, 'El cambio debe empezar durante la vigencia de la recurrencia.');
+        abort_if(
+            ($validated['number_occurrences_in_notes'] ?? $recurringExpense->number_occurrences_in_notes)
+                && array_key_exists('ends_on', $validated) && $validated['ends_on'] === null,
+            422,
+            'Indique una fecha de fin para numerar las repeticiones.'
+        );
         abort_if(isset($validated['ends_on']) && $validated['ends_on'] < $effectiveMonth->toDateString(), 422, 'La fecha de fin debe ser posterior al inicio del cambio.');
         abort_if(
             $recurringExpense->occurrences()->where('period', '>=', $effectiveMonth->toDateString())->exists(),
@@ -101,6 +109,7 @@ class RecurringExpenseController extends Controller
                 ...$recurringExpense->only([
                     'user_id', 'category_id', 'card_id', 'description', 'place', 'payment_method',
                     'currency', 'amount_type', 'amount', 'day_of_month', 'is_active', 'series_key',
+                    'notes', 'number_occurrences_in_notes',
                 ]),
                 ...$validated,
                 'starts_on' => $effectiveMonth->toDateString(),
@@ -169,6 +178,7 @@ class RecurringExpenseController extends Controller
                     'currency' => $recurringExpense->currency,
                     'purchase_date' => $chargeDate->toDateString(),
                     'payment_date' => $paymentDate,
+                    'notes' => $this->noteService->forMonth($recurringExpense, $month),
                 ]);
                 $occurrence->update(['transaction_id' => $transaction->id]);
             }
@@ -243,6 +253,7 @@ class RecurringExpenseController extends Controller
                 'currency' => $recurringExpense->currency,
                 'purchase_date' => $chargeDate->toDateString(),
                 'payment_date' => $paymentDate,
+                'notes' => $this->noteService->forMonth($recurringExpense, $month),
             ];
 
             if ($transaction) {

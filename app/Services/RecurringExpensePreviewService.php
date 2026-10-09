@@ -9,6 +9,8 @@ use Illuminate\Support\Collection;
 
 class RecurringExpensePreviewService
 {
+    public function __construct(private RecurringExpenseNoteService $noteService) {}
+
     public function chargeDate(RecurringExpense $expense, CarbonImmutable $month): CarbonImmutable
     {
         return $month->startOfMonth()->setDay(min($expense->day_of_month, $month->daysInMonth));
@@ -45,6 +47,12 @@ class RecurringExpensePreviewService
             ->get()
             ->keyBy('recurring_expense_id');
 
+        $numberedSeries = RecurringExpense::query()
+            ->where('user_id', $userId)
+            ->whereIn('series_key', $expenses->where('number_occurrences_in_notes', true)->pluck('series_key'))
+            ->get()
+            ->groupBy('series_key');
+
         $variableSeries = $expenses->where('amount_type', 'variable')->pluck('series_key')->filter();
         $latestAmounts = RecurringExpenseOccurrence::query()
             ->whereHas('recurringExpense', fn ($query) => $query->whereIn('series_key', $variableSeries))
@@ -59,7 +67,7 @@ class RecurringExpensePreviewService
                 $occurrence->recurringExpense->series_key => $occurrence->transaction->amount,
             ]);
 
-        return $expenses->map(function (RecurringExpense $expense) use ($month, $occurrences, $latestAmounts): array {
+        return $expenses->map(function (RecurringExpense $expense) use ($month, $occurrences, $latestAmounts, $numberedSeries): array {
             $occurrence = $occurrences->get($expense->id);
             $suggestedAmount = $expense->amount_type === 'variable'
                 ? $latestAmounts->get($expense->series_key)
@@ -69,6 +77,7 @@ class RecurringExpensePreviewService
                 'id' => $expense->id,
                 'description' => $occurrence?->transaction?->description ?? $expense->description,
                 'place' => $occurrence?->transaction?->place ?? $expense->place,
+                'notes' => $occurrence?->transaction?->notes ?? $this->noteService->forMonth($expense, $month, $numberedSeries->get($expense->series_key)),
                 'amount_type' => $expense->amount_type,
                 'suggested_amount' => $suggestedAmount,
                 'amount' => $occurrence?->transaction?->amount ?? $suggestedAmount,

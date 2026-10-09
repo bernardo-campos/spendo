@@ -311,3 +311,114 @@ test('a confirmed recurring card charge stays in its charge month preview and is
     $this->getJson('/transactions?period=2026-12')->assertExactJson([]);
     expect(Transaction::query()->sole()->payment_date->toDateString())->toBe('2026-12-20');
 });
+
+test('a bounded recurring expense previews and saves numbered notes without creating future transactions', function () {
+    $this->travelTo(Carbon::parse('2026-10-31'));
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'day_of_month' => 31,
+        'starts_on' => '2026-01-31',
+        'ends_on' => '2026-10-31',
+        'notes' => 'Suscripción anual',
+        'number_occurrences_in_notes' => true,
+    ]);
+
+    $this->actingAs($user)->getJson('/recurring-expenses/preview?period=2026-02')
+        ->assertJsonPath('0.charge_date', '2026-02-28')
+        ->assertJsonPath('0.notes', "Suscripción anual\n2 de 10");
+
+    expect(Transaction::query()->count())->toBe(0);
+
+    $this->putJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1000,
+    ])->assertSuccessful();
+
+    expect(Transaction::query()->sole()->notes)->toBe("Suscripción anual\n10 de 10");
+});
+
+test('the recurring expense form stores its note and numbering choice', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/recurring-expenses', [
+        'description' => 'Curso', 'payment_method' => 'cash', 'currency' => 'ARS',
+        'amount_type' => 'fixed', 'amount' => 1000, 'day_of_month' => 15,
+        'starts_on' => '2026-01-01', 'ends_on' => '2026-10-31',
+        'notes' => 'Módulo mensual', 'number_occurrences_in_notes' => true,
+    ])->assertCreated()
+        ->assertJsonPath('notes', 'Módulo mensual')
+        ->assertJsonPath('number_occurrences_in_notes', true);
+
+    $this->getJson('/api/v1/recurring-expenses')
+        ->assertJsonPath('data.0.id', $response->json('id'))
+        ->assertJsonPath('data.0.number_occurrences_in_notes', true);
+});
+
+test('numbering counts only charge dates inside the selected range and requires an end date', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/recurring-expenses', [
+        'description' => 'Curso', 'payment_method' => 'cash', 'currency' => 'ARS',
+        'amount_type' => 'fixed', 'amount' => 1000, 'day_of_month' => 15,
+        'starts_on' => '2026-01-20', 'number_occurrences_in_notes' => true,
+    ])->assertUnprocessable()->assertJsonValidationErrors('ends_on');
+
+    $this->postJson('/recurring-expenses', [
+        'description' => 'Curso', 'payment_method' => 'cash', 'currency' => 'ARS',
+        'amount_type' => 'fixed', 'amount' => 1000, 'day_of_month' => 15,
+        'starts_on' => '2026-01-20', 'ends_on' => '2026-02-01',
+    ])->assertUnprocessable()->assertJsonValidationErrors('ends_on');
+
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'day_of_month' => 15, 'starts_on' => '2026-01-20',
+        'ends_on' => '2026-03-15', 'number_occurrences_in_notes' => true,
+    ]);
+
+    $this->getJson('/recurring-expenses/preview?period=2026-02')
+        ->assertJsonPath('0.notes', '1 de 2');
+    $this->getJson('/recurring-expenses/preview?period=2026-03')
+        ->assertJsonPath('0.notes', '2 de 2');
+});
+
+test('numbering is optional and an ordinary recurring note remains unchanged', function () {
+    $this->travelTo(Carbon::parse('2026-10-20'));
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'starts_on' => '2026-09-01', 'ends_on' => '2026-12-31',
+        'notes' => 'Pago mensual', 'number_occurrences_in_notes' => false,
+    ]);
+
+    $this->actingAs($user)->getJson('/recurring-expenses/preview?period=2026-10')
+        ->assertJsonPath('0.notes', 'Pago mensual');
+    $this->putJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1000,
+    ])->assertSuccessful();
+
+    expect(Transaction::query()->sole()->notes)->toBe('Pago mensual');
+});
+
+test('numbering continues across later revisions of a recurring rule', function () {
+    $this->travelTo(Carbon::parse('2026-11-20'));
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'day_of_month' => 10, 'starts_on' => '2026-01-01',
+        'ends_on' => '2026-12-31', 'number_occurrences_in_notes' => true,
+    ]);
+
+    $this->actingAs($user)->putJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1000,
+    ])->assertSuccessful();
+
+    $this->putJson("/recurring-expenses/{$expense->id}", [
+        'description' => $expense->description,
+        'payment_method' => 'cash', 'currency' => 'ARS',
+        'amount_type' => 'fixed', 'amount' => 1200,
+        'day_of_month' => 10, 'starts_on' => '2026-01-01',
+        'ends_on' => '2026-12-31', 'effective_period' => '2026-11',
+        'number_occurrences_in_notes' => true,
+    ])->assertSuccessful();
+
+    $this->getJson('/recurring-expenses/preview?period=2026-11')
+        ->assertJsonPath('0.notes', '11 de 12');
+
+    expect(Transaction::query()->sole()->notes)->toBe('10 de 12');
+});

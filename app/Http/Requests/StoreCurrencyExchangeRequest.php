@@ -39,6 +39,12 @@ class StoreCurrencyExchangeRequest extends FormRequest
                     ->where('user_id', $this->user()->id)
                     ->whereIn('scope', ['expense', 'both'])),
             ],
+            'income_category_id' => [
+                'nullable',
+                Rule::exists('categories', 'id')->where(fn ($query) => $query
+                    ->where('user_id', $this->user()->id)
+                    ->whereIn('scope', ['income', 'both'])),
+            ],
             'tag_ids' => ['sometimes', 'array'],
             'tag_ids.*' => [
                 'integer',

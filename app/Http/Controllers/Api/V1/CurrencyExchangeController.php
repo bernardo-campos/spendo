@@ -32,7 +32,7 @@ class CurrencyExchangeController extends Controller
                         ->whereHas('income', fn ($leg) => $leg->where('currency', $validated['source_currency']));
                 });
             })
-            ->with(['expense.category', 'expense.tags', 'income.tags'])
+            ->with(['expense.category', 'expense.tags', 'income.category', 'income.tags'])
             ->latest('id')
             ->first();
 
@@ -100,7 +100,7 @@ class CurrencyExchangeController extends Controller
         );
         $income = Transaction::query()->updateOrCreate(
             ['exchange_id' => $exchange->id, 'type' => 'income'],
-            [...$shared, 'type' => 'income', 'amount' => $data['target_amount'], 'currency' => $data['target_currency'], 'place' => null, 'payment_method' => null, 'category_id' => null],
+            [...$shared, 'type' => 'income', 'amount' => $data['target_amount'], 'currency' => $data['target_currency'], 'place' => null, 'payment_method' => null, 'category_id' => $data['income_category_id'] ?? null],
         );
 
         $expense->tags()->sync($data['tag_ids'] ?? []);
@@ -114,7 +114,7 @@ class CurrencyExchangeController extends Controller
 
     private function respond(Request $request, CurrencyExchange $exchange, int $status = 200): JsonResponse
     {
-        $payload = $this->payload($exchange->fresh(['expense.category', 'expense.tags', 'income.tags']));
+        $payload = $this->payload($exchange->fresh(['expense.category', 'expense.tags', 'income.category', 'income.tags']));
 
         return response()->json($request->routeIs('api.v1.*') ? ['data' => $payload] : $payload, $status);
     }

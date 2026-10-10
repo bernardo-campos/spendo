@@ -146,7 +146,7 @@ const form = ref({
 const exchangeForm = ref({
     source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
     purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
-    category_id: '', tag_ids: [],
+    category_id: '', income_category_id: '', tag_ids: [],
 });
 const exchangeReturnScreen = ref('expense-list');
 const openExchangeForm = () => {
@@ -154,7 +154,7 @@ const openExchangeForm = () => {
     exchangeForm.value = {
         source_currency: 'ARS', source_amount: '', target_currency: 'USD', target_amount: '',
         purchase_date: formatLocalDate(), description: 'Cambio de moneda', place: '', notes: '',
-        category_id: '', tag_ids: [],
+        category_id: '', income_category_id: '', tag_ids: [],
     };
     openTransactionForm('exchange');
 };
@@ -460,6 +460,7 @@ const openExchangeEdit = async (exchangeId, returnScreen = 'expense-list') => {
             place: exchange.expense.place ?? '',
             notes: exchange.expense.notes ?? '',
             category_id: exchange.expense.category_id ?? '',
+            income_category_id: exchange.income.category_id ?? '',
             tag_ids: (exchange.expense.tags ?? []).map((tag) => tag.id),
         };
         form.value.type = 'exchange';
@@ -695,6 +696,7 @@ const submitExchange = async () => {
             place: exchangeForm.value.place.trim() || null,
             notes: exchangeForm.value.notes.trim() || null,
             category_id: exchangeForm.value.category_id || null,
+            income_category_id: exchangeForm.value.income_category_id || null,
             tag_ids: exchangeForm.value.tag_ids,
         };
         const editing = editingTransactionId.value !== null;

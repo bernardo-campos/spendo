@@ -459,11 +459,13 @@ const applyOptimisticMutation = async (method, url, payload) => {
             return { item: existing, localId: route.id };
         }
         item = optimisticExchange(payload, id, existing);
-        const [category, tags] = await Promise.all([
+        const [expenseCategory, incomeCategory, tags] = await Promise.all([
             payload.category_id ? getValue(recordKey('categories', payload.category_id)) : null,
+            payload.income_category_id ? getValue(recordKey('categories', payload.income_category_id)) : null,
             Promise.all((payload.tag_ids ?? []).map((tagId) => getValue(recordKey('tags', tagId)))),
         ]);
-        item.expense.category = category;
+        item.expense.category = expenseCategory;
+        item.income.category = incomeCategory;
         item.expense.tags = tags.filter(Boolean);
         item.income.tags = tags.filter(Boolean);
         await writeExchange(item);

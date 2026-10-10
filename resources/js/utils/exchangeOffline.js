@@ -17,7 +17,7 @@ export const optimisticExchange = (payload, id, existing = null) => {
         income: {
             ...shared, id: existing?.income?.id ?? `${id}-income`, type: 'income',
             currency: payload.target_currency, amount: payload.target_amount, place: null,
-            category_id: null,
+            category_id: payload.income_category_id ?? null,
         },
     };
 };

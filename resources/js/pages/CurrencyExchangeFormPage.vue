@@ -37,10 +37,15 @@ const targetCurrency = computed({
     get: () => props.currencies.find((currency) => currency.value === props.form.target_currency) ?? props.currencies[1] ?? null,
     set: (currency) => { props.form.target_currency = currency?.value ?? 'USD'; },
 });
-const categoryOptions = computed(() => props.categories.filter((category) => ['expense', 'both'].includes(category.scope)));
-const selectedCategory = computed({
-    get: () => categoryOptions.value.find((category) => Number(category.id) === Number(props.form.category_id)) ?? null,
+const expenseCategoryOptions = computed(() => props.categories.filter((category) => ['expense', 'both'].includes(category.scope)));
+const incomeCategoryOptions = computed(() => props.categories.filter((category) => ['income', 'both'].includes(category.scope)));
+const selectedExpenseCategory = computed({
+    get: () => expenseCategoryOptions.value.find((category) => Number(category.id) === Number(props.form.category_id)) ?? null,
     set: (category) => { props.form.category_id = category?.id ?? ''; },
+});
+const selectedIncomeCategory = computed({
+    get: () => incomeCategoryOptions.value.find((category) => Number(category.id) === Number(props.form.income_category_id)) ?? null,
+    set: (category) => { props.form.income_category_id = category?.id ?? ''; },
 });
 const selectedTagValues = computed({
     get: () => (props.form.tag_ids ?? []).map((tagId) => String(tagId)),
@@ -130,11 +135,20 @@ const updateEditedAmount = (amount) => {
                 <label class="block space-y-1 text-sm"><span class="font-medium">Lugar (opcional)</span><input v-model="form.place" type="text" maxlength="120" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"></label>
 
                 <div class="space-y-1 text-sm">
-                    <span class="font-medium">Categoría</span>
-                    <div class="flex flex-wrap gap-2" role="group" aria-label="Seleccionar categoría">
-                        <button type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="selectedCategory === null ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="selectedCategory === null" @click="selectedCategory = null">Sin categoría</button>
-                        <button v-for="category in categoryOptions" :key="category.id" type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="Number(selectedCategory?.id) === Number(category.id) ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="Number(selectedCategory?.id) === Number(category.id)" @click="selectedCategory = category">{{ category.name }}</button>
-                        <span v-if="categoryOptions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay categorías disponibles.</span>
+                    <span class="font-medium">Categoría egreso</span>
+                    <div class="flex flex-wrap gap-2" role="group" aria-label="Seleccionar categoría egreso">
+                        <button type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="selectedExpenseCategory === null ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="selectedExpenseCategory === null" @click="selectedExpenseCategory = null">Sin categoría</button>
+                        <button v-for="category in expenseCategoryOptions" :key="category.id" type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="Number(selectedExpenseCategory?.id) === Number(category.id) ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="Number(selectedExpenseCategory?.id) === Number(category.id)" @click="selectedExpenseCategory = category">{{ category.name }}</button>
+                        <span v-if="expenseCategoryOptions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay categorías disponibles.</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1 text-sm">
+                    <span class="font-medium">Categoría ingreso</span>
+                    <div class="flex flex-wrap gap-2" role="group" aria-label="Seleccionar categoría ingreso">
+                        <button type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="selectedIncomeCategory === null ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="selectedIncomeCategory === null" @click="selectedIncomeCategory = null">Sin categoría</button>
+                        <button v-for="category in incomeCategoryOptions" :key="category.id" type="button" class="rounded-full px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" :class="Number(selectedIncomeCategory?.id) === Number(category.id) ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'" :aria-pressed="Number(selectedIncomeCategory?.id) === Number(category.id)" @click="selectedIncomeCategory = category">{{ category.name }}</button>
+                        <span v-if="incomeCategoryOptions.length === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay categorías disponibles.</span>
                     </div>
                 </div>
 

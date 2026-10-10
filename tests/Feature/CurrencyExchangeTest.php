@@ -74,34 +74,45 @@ test('exchange legs can only be edited or deleted together', function () {
         ->and(Transaction::query()->count())->toBe(0);
 });
 
-test('an exchange saves its expense category and shares tags between both legs', function () {
+test('an exchange saves separate categories and shares tags between both legs', function () {
     $user = User::factory()->create();
-    $category = Category::query()->create(['user_id' => $user->id, 'name' => 'Ahorro', 'slug' => 'ahorro', 'scope' => 'expense']);
+    $expenseCategory = Category::query()->create(['user_id' => $user->id, 'name' => 'Ahorro', 'slug' => 'ahorro', 'scope' => 'expense']);
+    $incomeCategory = Category::query()->create(['user_id' => $user->id, 'name' => 'Cambio recibido', 'slug' => 'cambio-recibido', 'scope' => 'income']);
     $tag = Tag::query()->create(['user_id' => $user->id, 'name' => 'Dólares', 'slug' => 'dolares']);
     $exchangeId = $this->actingAs($user)->postJson('/currency-exchanges', exchangePayload([
-        'category_id' => $category->id, 'tag_ids' => [$tag->id],
+        'category_id' => $expenseCategory->id, 'income_category_id' => $incomeCategory->id, 'tag_ids' => [$tag->id],
     ]))->assertCreated()
-        ->assertJsonPath('expense.category_id', $category->id)
+        ->assertJsonPath('expense.category_id', $expenseCategory->id)
+        ->assertJsonPath('expense.category.name', 'Ahorro')
         ->assertJsonPath('expense.tags.0.id', $tag->id)
-        ->assertJsonPath('income.category_id', null)
+        ->assertJsonPath('income.category_id', $incomeCategory->id)
+        ->assertJsonPath('income.category.name', 'Cambio recibido')
         ->assertJsonPath('income.tags.0.id', $tag->id)
         ->json('id');
 
     $this->putJson("/currency-exchanges/{$exchangeId}", exchangePayload([
-        'category_id' => null, 'tag_ids' => [],
+        'category_id' => null, 'income_category_id' => null, 'tag_ids' => [],
     ]))->assertSuccessful()->assertJsonPath('expense.category_id', null)
+        ->assertJsonPath('income.category_id', null)
         ->assertJsonCount(0, 'expense.tags')->assertJsonCount(0, 'income.tags');
 });
 
-test('exchange categories and tags must belong to the user and category must support expenses', function () {
+test('exchange categories must belong to the user and match each movement type', function () {
     $user = User::factory()->create();
     $other = User::factory()->create();
+    $expenseCategory = Category::query()->create(['user_id' => $user->id, 'name' => 'Ahorro', 'slug' => 'ahorro', 'scope' => 'expense']);
     $incomeCategory = Category::query()->create(['user_id' => $user->id, 'name' => 'Sueldo', 'slug' => 'sueldo', 'scope' => 'income']);
+    $otherIncomeCategory = Category::query()->create(['user_id' => $other->id, 'name' => 'Ajeno', 'slug' => 'ajeno-ingreso', 'scope' => 'income']);
     $otherTag = Tag::query()->create(['user_id' => $other->id, 'name' => 'Ajeno', 'slug' => 'ajeno']);
 
     $this->actingAs($user)->postJson('/currency-exchanges', exchangePayload([
-        'category_id' => $incomeCategory->id, 'tag_ids' => [$otherTag->id],
-    ]))->assertUnprocessable()->assertJsonValidationErrors(['category_id', 'tag_ids.0']);
+        'category_id' => $incomeCategory->id,
+        'income_category_id' => $expenseCategory->id,
+        'tag_ids' => [$otherTag->id],
+    ]))->assertUnprocessable()->assertJsonValidationErrors(['category_id', 'income_category_id', 'tag_ids.0']);
+    $this->postJson('/currency-exchanges', exchangePayload([
+        'income_category_id' => $otherIncomeCategory->id,
+    ]))->assertUnprocessable()->assertJsonValidationErrors(['income_category_id']);
     expect(CurrencyExchange::query()->count())->toBe(0);
 });
 

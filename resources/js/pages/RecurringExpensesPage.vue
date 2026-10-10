@@ -13,6 +13,7 @@ import {
     ComboboxTrigger,
 } from '@/components/ui/combobox';
 import { formatLocalDate } from '../utils/localDate';
+import { calculateFirstInstallmentPaymentDate } from '../utils/cardPaymentDates';
 import { recurringExpenseSchedule } from '../utils/recurringExpenseSchedule';
 
 const currencies = [
@@ -73,6 +74,12 @@ const selectedCard = computed({
     get: () => props.cards.find((card) => Number(card.id) === Number(form.value.card_id)) ?? null,
     set: (card) => { form.value.card_id = card?.id ?? ''; },
 });
+const scheduledItems = computed(() => (schedulePreview.value?.items ?? []).map((item) => ({
+    ...item,
+    paymentDate: form.value.payment_method === 'credit'
+        ? calculateFirstInstallmentPaymentDate(item.date, selectedCard.value)
+        : item.date,
+})));
 const selectedCurrency = computed({
     get: () => currencies.find((currency) => currency.value === form.value.currency) ?? currencies[0],
     set: (currency) => { form.value.currency = currency?.value ?? 'ARS'; },
@@ -320,9 +327,10 @@ defineExpose({ reset });
                     <p v-if="editingId && form.number_occurrences_in_notes" class="text-xs text-slate-500 dark:text-slate-400">Al editar una regla, la numeración final conserva los cargos anteriores de la misma serie.</p>
                     <p v-if="schedulePreview.total === 0" class="text-sm text-slate-500 dark:text-slate-400">No hay fechas de cargo dentro del rango elegido.</p>
                     <ul v-else class="max-h-64 space-y-2 overflow-y-auto pr-1" aria-label="Cargos previstos">
-                        <li v-for="item in schedulePreview.items" :key="item.date" class="flex flex-wrap items-start justify-between gap-x-3 border-b border-slate-200 pb-2 text-sm last:border-b-0 last:pb-0 dark:border-slate-800">
+                        <li v-for="item in scheduledItems" :key="item.date" class="flex flex-wrap items-start justify-between gap-x-3 border-b border-slate-200 pb-2 text-sm last:border-b-0 last:pb-0 dark:border-slate-800">
                             <div>
-                                <p class="font-medium">{{ formatPreviewDate(item.date) }}</p>
+                                <p class="font-medium">{{ form.payment_method === 'credit' ? 'Vencimiento' : 'Cargo' }}: {{ item.paymentDate ? formatPreviewDate(item.paymentDate) : 'Seleccioná una tarjeta' }}</p>
+                                <p v-if="form.payment_method === 'credit'" class="text-xs text-slate-500 dark:text-slate-400">Cargo: {{ formatPreviewDate(item.date) }}</p>
                                 <p v-if="!editingId && item.notes" class="whitespace-pre-line text-xs text-slate-500 dark:text-slate-400">Nota: {{ item.notes }}</p>
                             </div>
                             <span class="tabular-nums text-slate-600 dark:text-slate-300">{{ form.amount_type === 'fixed' && form.amount ? formatCurrencyAmount(form.currency, form.amount) : `≈ ${selectedCurrency?.symbol ?? form.currency} —` }}</span>

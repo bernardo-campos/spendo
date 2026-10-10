@@ -69,8 +69,10 @@ export const useTransactions = (selectedPeriod, recurringPreview = ref([])) => {
     const recurringExpenses = computed(() => recurringPreview.value
         .filter((item) => item.status !== 'skipped')
         .map((item) => ({
-            id: `recurring-${item.id}-${selectedPeriod.value}`,
+            id: `recurring-${item.id}-${String(item.charge_date).slice(0, 7)}`,
             recurring_expense_id: item.id,
+            recurring_period: String(item.charge_date).slice(0, 7),
+            charge_date: item.charge_date,
             recurring_status: item.status,
             is_unconfirmed_recurring: item.amount_type === 'variable' && item.status === 'pending',
             is_approximate: item.amount_type === 'variable' && item.status === 'pending',
@@ -81,7 +83,8 @@ export const useTransactions = (selectedPeriod, recurringPreview = ref([])) => {
             notes: item.notes,
             amount: item.amount,
             currency: item.currency,
-            purchase_date: item.charge_date,
+            purchase_date: item.payment_date,
+            payment_date: item.payment_date,
             payment_method: item.payment_method,
             card_id: item.card?.id,
             card: item.card,

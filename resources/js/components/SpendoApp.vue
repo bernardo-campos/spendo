@@ -396,13 +396,13 @@ const saveRecurringRule = async ({ id, payload }) => {
     }
 };
 
-const saveRecurringOccurrence = async ({ id, status, amount, description }) => {
+const saveRecurringOccurrence = async ({ id, period, status, amount, description }) => {
     recurringBusy.value = true;
     errorMessage.value = '';
     successMessage.value = '';
     try {
         await window.axios.put(`/recurring-expenses/${id}/decisions`, {
-            period: selectedPeriod.value,
+            period,
             status,
             ...(status === 'confirmed' ? { amount, description } : {}),
         });

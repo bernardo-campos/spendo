@@ -107,6 +107,7 @@ const saveRecurring = (status) => {
 
     emit('save-recurring', {
         id: editingRecurring.value.recurring_expense_id,
+        period: editingRecurring.value.recurring_period,
         status,
         amount: status === 'confirmed' ? recurringAmount.value : null,
         description: recurringDescription.value,
@@ -336,6 +337,7 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                                                         </p>
                                                         <p v-if="shouldShowExpenseField(transaction, 'show_tags') && tagNames(transaction)" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ tagNames(transaction) }}</p>
                                                         <p v-if="transaction.place" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.place }}</p>
+                                                        <p v-if="transaction.recurring_expense_id && transaction.payment_method === 'credit'" class="truncate text-xs text-slate-500 dark:text-slate-400">Cargo: {{ formatTransactionDate(transaction.charge_date) }}</p>
                                                         <p v-if="shouldShowExpenseField(transaction, 'show_description')" class="truncate italic text-slate-500 dark:text-slate-400">{{ transaction.description }}</p>
                                                         <p v-if="shouldShowExpenseField(transaction, 'show_notes') && transaction.notes" class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.notes }}</p>
                                                         <p v-if="transactionTypeLabel(transaction) || transaction.installment_number" class="text-xs text-slate-500 dark:text-slate-400">
@@ -366,7 +368,7 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{{ editingRecurring?.is_unconfirmed_recurring ? 'Confirmar importe' : 'Editar gasto de este mes' }}</DialogTitle>
-                    <DialogDescription>El cambio afecta solo a {{ selectedPeriod }}. La regla mensual conserva su importe.</DialogDescription>
+                    <DialogDescription>El cambio afecta solo al cargo de {{ formatTransactionDate(editingRecurring?.charge_date) }}. La regla mensual conserva su importe.</DialogDescription>
                 </DialogHeader>
                 <form class="grid gap-4" @submit.prevent="saveRecurring('confirmed')">
                     <label class="grid gap-1 text-sm font-medium">Descripción

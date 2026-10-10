@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\PaymentMethodType;
 use App\Models\Card;
+use App\Models\CardBillingCycle;
 use Carbon\CarbonImmutable;
 
 class CardPaymentDateService
@@ -27,11 +28,15 @@ class CardPaymentDateService
             ? $purchase->startOfMonth()
             : $purchase->addMonthNoOverflow()->startOfMonth();
 
-        $cycle = $card->billingCycles()
-            ->whereYear('closing_date', $statementMonth->year)
-            ->whereMonth('closing_date', $statementMonth->month)
-            ->orderBy('closing_date')
-            ->first();
+        $cycle = $card->relationLoaded('billingCycles')
+            ? $card->billingCycles
+                ->sortBy('closing_date')
+                ->first(fn (CardBillingCycle $billingCycle): bool => $billingCycle->closing_date->format('Y-m') === $statementMonth->format('Y-m'))
+            : $card->billingCycles()
+                ->whereYear('closing_date', $statementMonth->year)
+                ->whereMonth('closing_date', $statementMonth->month)
+                ->orderBy('closing_date')
+                ->first();
 
         if ($cycle !== null) {
             return [

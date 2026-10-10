@@ -289,7 +289,7 @@ test('a variable recurrence uses the previous amount as an estimate until edited
     expect(Transaction::query()->count())->toBe(2);
 });
 
-test('a confirmed recurring card charge stays in its charge month preview and is not duplicated in the payment month list', function () {
+test('a recurring card charge appears in the payment month without duplication', function () {
     $this->travelTo(Carbon::parse('2026-10-20'));
     $user = User::factory()->create();
     $card = Card::query()->create([
@@ -305,11 +305,78 @@ test('a confirmed recurring card charge stays in its charge month preview and is
         'period' => '2026-10', 'status' => 'confirmed', 'amount' => 25,
     ])->assertSuccessful();
 
-    $this->getJson('/recurring-expenses/preview?period=2026-10')
+    $this->getJson('/recurring-expenses/preview?period=2026-10')->assertExactJson([]);
+    $this->getJson('/recurring-expenses/preview?period=2026-12')
         ->assertJsonPath('0.amount', '25.00')
+        ->assertJsonPath('0.charge_date', '2026-10-15')
+        ->assertJsonPath('0.payment_date', '2026-12-20')
         ->assertJsonPath('0.status', 'confirmed');
     $this->getJson('/transactions?period=2026-12')->assertExactJson([]);
     expect(Transaction::query()->sole()->payment_date->toDateString())->toBe('2026-12-20');
+});
+
+test('an unconfirmed recurring card charge is projected in its payment month without persistence', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id, 'name' => 'Visa', 'last_four_digits' => '1234',
+        'closing_day' => 10, 'due_day' => 20, 'is_active' => true,
+    ]);
+    RecurringExpense::factory()->for($user)->create([
+        'payment_method' => 'credit', 'card_id' => $card->id,
+        'day_of_month' => 15, 'starts_on' => '2026-10-01',
+    ]);
+
+    $this->actingAs($user)->getJson('/recurring-expenses/preview?period=2026-10')->assertExactJson([]);
+    $this->getJson('/recurring-expenses/preview?period=2026-12')
+        ->assertJsonPath('0.charge_date', '2026-10-15')
+        ->assertJsonPath('0.payment_date', '2026-12-20')
+        ->assertJsonPath('0.status', 'pending');
+
+    expect(Transaction::query()->count())->toBe(0);
+});
+
+test('a real card cycle can move a virtual recurring charge beyond the usual payment window', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id, 'name' => 'Visa', 'last_four_digits' => '1234',
+        'closing_day' => 10, 'due_day' => 20, 'is_active' => true,
+    ]);
+    $card->billingCycles()->create([
+        'closing_date' => '2026-10-10', 'due_date' => '2027-03-20',
+    ]);
+    RecurringExpense::factory()->for($user)->create([
+        'payment_method' => 'credit', 'card_id' => $card->id,
+        'day_of_month' => 5, 'starts_on' => '2026-10-01', 'ends_on' => '2026-10-31',
+    ]);
+
+    $this->actingAs($user)->getJson('/recurring-expenses/preview?period=2027-03')
+        ->assertJsonPath('0.charge_date', '2026-10-05')
+        ->assertJsonPath('0.payment_date', '2027-03-20');
+});
+
+test('two monthly charges can share one card payment month without collapsing into one expense', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id, 'name' => 'Visa', 'last_four_digits' => '1234',
+        'closing_day' => 10, 'due_day' => 20, 'is_active' => true,
+    ]);
+    $card->billingCycles()->create([
+        'closing_date' => '2026-11-10', 'due_date' => '2026-12-20',
+    ]);
+    $card->billingCycles()->create([
+        'closing_date' => '2026-12-10', 'due_date' => '2026-12-20',
+    ]);
+    RecurringExpense::factory()->for($user)->create([
+        'payment_method' => 'credit', 'card_id' => $card->id,
+        'day_of_month' => 15, 'starts_on' => '2026-10-01',
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/recurring-expenses/preview?period=2026-12')
+        ->assertSuccessful()
+        ->assertJsonCount(2);
+
+    expect(collect($response->json())->pluck('charge_date')->sort()->values()->all())
+        ->toBe(['2026-10-15', '2026-11-15']);
 });
 
 test('a bounded recurring expense previews and saves numbered notes without creating future transactions', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CardBillingCycle;
 use App\Models\RecurringExpense;
 use App\Models\RecurringExpenseOccurrence;
 use Carbon\CarbonImmutable;
@@ -9,7 +10,12 @@ use Illuminate\Support\Collection;
 
 class RecurringExpensePreviewService
 {
-    public function __construct(private RecurringExpenseNoteService $noteService) {}
+    private const int ESTIMATED_PAYMENT_LOOKBACK_MONTHS = 3;
+
+    public function __construct(
+        private RecurringExpenseNoteService $noteService,
+        private CardPaymentDateService $cardPaymentDateService,
+    ) {}
 
     public function chargeDate(RecurringExpense $expense, CarbonImmutable $month): CarbonImmutable
     {
@@ -30,13 +36,49 @@ class RecurringExpensePreviewService
      */
     public function forPeriod(int $userId, CarbonImmutable $month): Collection
     {
+        $month = $month->startOfMonth();
+        $candidateMonths = collect(range(0, self::ESTIMATED_PAYMENT_LOOKBACK_MONTHS))
+            ->map(fn (int $offset): CarbonImmutable => $month->subMonthsNoOverflow($offset));
+
+        $cycles = CardBillingCycle::query()
+            ->whereHas('card', fn ($query) => $query->where('user_id', $userId))
+            ->whereBetween('due_date', [$month->toDateString(), $month->endOfMonth()->toDateString()])
+            ->get();
+
+        foreach ($cycles as $cycle) {
+            $closingMonth = CarbonImmutable::parse($cycle->closing_date->toDateString())->startOfMonth();
+            $candidateMonths->push($closingMonth, $closingMonth->subMonth());
+        }
+
+        $confirmedPeriods = RecurringExpenseOccurrence::query()
+            ->whereHas('recurringExpense', fn ($query) => $query->where('user_id', $userId))
+            ->whereHas('transaction', fn ($query) => $query->whereBetween('payment_date', [$month->toDateString(), $month->endOfMonth()->toDateString()]))
+            ->pluck('period');
+
+        foreach ($confirmedPeriods as $period) {
+            $candidateMonths->push(CarbonImmutable::parse($period)->startOfMonth());
+        }
+
+        return $candidateMonths
+            ->unique(fn (CarbonImmutable $candidate): string => $candidate->toDateString())
+            ->flatMap(fn (CarbonImmutable $candidate): Collection => $this->forChargePeriod($userId, $candidate))
+            ->filter(fn (array $item): bool => str_starts_with($item['payment_date'], $month->format('Y-m')))
+            ->sortBy('payment_date')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function forChargePeriod(int $userId, CarbonImmutable $month): Collection
+    {
         $period = $month->startOfMonth()->toDateString();
         $expenses = RecurringExpense::query()
             ->where('user_id', $userId)
             ->where('is_active', true)
             ->where('starts_on', '<=', $month->endOfMonth()->toDateString())
             ->where(fn ($query) => $query->whereNull('ends_on')->orWhere('ends_on', '>=', $period))
-            ->with(['card', 'category'])
+            ->with(['card.billingCycles', 'category'])
             ->get()
             ->filter(fn (RecurringExpense $expense): bool => $this->appliesTo($expense, $month));
 
@@ -73,6 +115,10 @@ class RecurringExpensePreviewService
                 ? $latestAmounts->get($expense->series_key)
                 : $expense->amount;
 
+            $chargeDate = $this->chargeDate($expense, $month)->toDateString();
+            $paymentDate = $occurrence?->transaction?->payment_date?->toDateString()
+                ?? $this->cardPaymentDateService->resolve($chargeDate, $expense->payment_method, $expense->card)['date'];
+
             return [
                 'id' => $expense->id,
                 'description' => $occurrence?->transaction?->description ?? $expense->description,
@@ -82,7 +128,8 @@ class RecurringExpensePreviewService
                 'suggested_amount' => $suggestedAmount,
                 'amount' => $occurrence?->transaction?->amount ?? $suggestedAmount,
                 'currency' => $expense->currency,
-                'charge_date' => $this->chargeDate($expense, $month)->toDateString(),
+                'charge_date' => $chargeDate,
+                'payment_date' => $paymentDate,
                 'payment_method' => $expense->payment_method,
                 'card' => $expense->card,
                 'category' => $expense->category,

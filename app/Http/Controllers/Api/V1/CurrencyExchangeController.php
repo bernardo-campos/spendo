@@ -96,7 +96,7 @@ class CurrencyExchangeController extends Controller
 
         $expense = Transaction::query()->updateOrCreate(
             ['exchange_id' => $exchange->id, 'type' => 'expense'],
-            [...$shared, 'type' => 'expense', 'amount' => $data['source_amount'], 'currency' => $data['source_currency'], 'place' => $data['place'] ?? null, 'payment_method' => null, 'category_id' => $data['category_id'] ?? null],
+            [...$shared, 'type' => 'expense', 'amount' => $data['source_amount'], 'currency' => $data['source_currency'], 'place' => $data['place'] ?? null, 'payment_method' => 'cash', 'category_id' => $data['category_id'] ?? null],
         );
         $income = Transaction::query()->updateOrCreate(
             ['exchange_id' => $exchange->id, 'type' => 'income'],

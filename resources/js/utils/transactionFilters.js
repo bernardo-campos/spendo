@@ -1,3 +1,8 @@
 export const filterTransactionsByPaymentAndCurrency = (transactions, paymentMethods, currencies) => transactions.filter(
-    (transaction) => paymentMethods.includes(transaction.payment_method) && currencies.includes(transaction.currency),
+    (transaction) => {
+        const paymentMethod = transaction.payment_method
+            ?? (transaction.exchange_id && transaction.type === 'expense' ? 'cash' : null);
+
+        return paymentMethods.includes(paymentMethod) && currencies.includes(transaction.currency);
+    },
 );

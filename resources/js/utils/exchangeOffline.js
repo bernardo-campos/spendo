@@ -12,7 +12,7 @@ export const optimisticExchange = (payload, id, existing = null) => {
         expense: {
             ...shared, id: existing?.expense?.id ?? `${id}-expense`, type: 'expense',
             currency: payload.source_currency, amount: payload.source_amount, place: payload.place ?? null,
-            category_id: payload.category_id ?? null,
+            category_id: payload.category_id ?? null, payment_method: 'cash',
         },
         income: {
             ...shared, id: existing?.income?.id ?? `${id}-income`, type: 'income',

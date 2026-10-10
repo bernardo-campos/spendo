@@ -29,9 +29,11 @@ test('an exchange creates two linked legs and affects both monthly totals', func
 
     expect(Transaction::query()->where('exchange_id', $exchangeId)->count())->toBe(2);
     $response->assertJsonPath('expense.type', 'expense')
+        ->assertJsonPath('expense.payment_method', 'cash')
         ->assertJsonPath('expense.currency', 'ARS')
         ->assertJsonPath('expense.amount', '1500.00')
         ->assertJsonPath('income.type', 'income')
+        ->assertJsonPath('income.payment_method', null)
         ->assertJsonPath('income.currency', 'USD')
         ->assertJsonPath('income.amount', '1.00');
     $this->getJson('/transactions?period=2026-09')->assertSuccessful()->assertJsonCount(2);
@@ -39,6 +41,20 @@ test('an exchange creates two linked legs and affects both monthly totals', func
         ->assertJsonPath('totals.ARS.expense', '1500.00')
         ->assertJsonPath('totals.USD.income', '1.00');
     Carbon::setTestNow();
+});
+
+test('previous exchange expenses are marked as cash without changing the income leg', function () {
+    $user = User::factory()->create();
+    $exchangeId = $this->actingAs($user)->postJson('/currency-exchanges', exchangePayload())->assertCreated()->json('id');
+    $expense = Transaction::query()->where('exchange_id', $exchangeId)->where('type', 'expense')->firstOrFail();
+    $income = Transaction::query()->where('exchange_id', $exchangeId)->where('type', 'income')->firstOrFail();
+    $expense->update(['payment_method' => null]);
+
+    $migration = require database_path('migrations/2026_10_10_001503_backfill_cash_payment_method_for_currency_exchange_expenses.php');
+    $migration->up();
+
+    expect($expense->fresh()->payment_method)->toBe('cash')
+        ->and($income->fresh()->payment_method)->toBeNull();
 });
 
 test('exchange legs can only be edited or deleted together', function () {
@@ -49,7 +65,8 @@ test('exchange legs can only be edited or deleted together', function () {
     $this->putJson("/transactions/{$expense->id}", ['amount' => 2])->assertUnprocessable();
     $this->deleteJson("/transactions/{$expense->id}")->assertUnprocessable();
     $this->putJson("/currency-exchanges/{$exchangeId}", exchangePayload(['source_amount' => '3000.00', 'target_amount' => '2.00']))
-        ->assertSuccessful()->assertJsonPath('income.amount', '2.00');
+        ->assertSuccessful()->assertJsonPath('income.amount', '2.00')
+        ->assertJsonPath('expense.payment_method', 'cash');
     expect(Transaction::query()->where('exchange_id', $exchangeId)->count())->toBe(2);
 
     $this->deleteJson("/currency-exchanges/{$exchangeId}")->assertNoContent();

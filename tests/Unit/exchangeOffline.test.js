@@ -13,7 +13,9 @@ test('one offline exchange yields both linked legs in the same period', () => {
     assert.equal(exchange.expense.exchange_id, exchange.id);
     assert.equal(exchange.income.exchange_id, exchange.id);
     assert.equal(exchange.expense.type, 'expense');
+    assert.equal(exchange.expense.payment_method, 'cash');
     assert.equal(exchange.income.type, 'income');
+    assert.equal(exchange.income.payment_method, null);
     assert.equal(exchange.expense.payment_date, exchange.income.purchase_date);
     assert.equal(exchange.expense.category_id, 4);
     assert.equal(exchange.income.category_id, null);
@@ -25,5 +27,6 @@ test('editing an offline exchange retains both leg identities', () => {
     assert.equal(changed.expense.id, original.expense.id);
     assert.equal(changed.income.id, original.income.id);
     assert.equal(changed.expense.amount, '3000.00');
+    assert.equal(changed.expense.payment_method, 'cash');
     assert.equal(changed.income.amount, '2.00');
 });

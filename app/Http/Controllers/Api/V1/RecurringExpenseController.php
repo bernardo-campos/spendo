@@ -137,7 +137,6 @@ class RecurringExpenseController extends Controller
         $month = CarbonImmutable::createFromFormat('!Y-m', $validated['period'])->startOfMonth();
         abort_unless($this->previewService->appliesTo($recurringExpense, $month), 422, 'La recurrencia no corresponde a ese mes.');
         $chargeDate = $this->previewService->chargeDate($recurringExpense, $month);
-        abort_if($chargeDate->isFuture(), 422, 'Todavía no llegó la fecha del cargo.');
         $amount = $validated['amount'] ?? $recurringExpense->amount;
         abort_if($validated['status'] === 'confirmed' && $amount === null, 422, 'Debe confirmar el importe de este mes.');
         abort_if($validated['status'] === 'confirmed' && $recurringExpense->payment_method === 'credit' && $recurringExpense->card === null, 422, 'La tarjeta de esta recurrencia ya no existe. Edite la regla antes de confirmar.');
@@ -210,7 +209,6 @@ class RecurringExpenseController extends Controller
         abort_unless($this->previewService->appliesTo($recurringExpense, $month), 422, 'La recurrencia no corresponde a ese mes.');
 
         $chargeDate = $this->previewService->chargeDate($recurringExpense, $month);
-        abort_if($validated['status'] === 'confirmed' && $recurringExpense->amount_type === 'variable' && $chargeDate->isFuture(), 422, 'Todavía no llegó la fecha del cargo.');
         abort_if($validated['status'] === 'confirmed' && $recurringExpense->payment_method === 'credit' && $recurringExpense->card === null, 422, 'La tarjeta de esta recurrencia ya no existe.');
 
         $occurrence = DB::transaction(function () use ($request, $recurringExpense, $month, $chargeDate, $validated): RecurringExpenseOccurrence {

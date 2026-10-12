@@ -54,4 +54,4 @@ Las rutas web autenticadas están disponibles también bajo `/api/v1`:
 | `PUT` | `/recurring-expenses/{id}/decisions` | Guardar, volver a editar u omitir un mes mediante `period`, `status`, `amount` y, opcionalmente, `description`. |
 | `POST` | `/recurring-expenses/{id}/decisions` | Registrar por primera vez una confirmación u omisión; rechaza decisiones repetidas. |
 
-La confirmación de un variable antes de su fecha de cargo se rechaza. Todas las operaciones verifican que la regla pertenezca al usuario autenticado.
+Un variable puede confirmarse antes de su fecha de cargo si ya se conoce el importe. Todas las operaciones verifican que la regla pertenezca al usuario autenticado.

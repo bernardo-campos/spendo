@@ -188,18 +188,48 @@ test('a variable amount suggestion survives a rule revision', function () {
         ->assertJsonPath('0.suggested_amount', '15359.00');
 });
 
-test('a future charge cannot be confirmed early', function () {
+test('a variable card charge can be confirmed before its charge date and appears in its payment month', function () {
+    $this->travelTo(Carbon::parse('2026-10-08'));
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id, 'name' => 'Visa', 'last_four_digits' => '1234',
+        'closing_day' => 10, 'due_day' => 20, 'is_active' => true,
+    ]);
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'amount_type' => 'variable', 'amount' => null,
+        'payment_method' => 'credit', 'card_id' => $card->id,
+        'day_of_month' => 15, 'starts_on' => '2026-10-01',
+    ]);
+
+    $this->actingAs($user)->putJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 15359,
+    ])->assertSuccessful()->assertJsonPath('status', 'confirmed');
+
+    $transaction = Transaction::query()->sole();
+    expect($transaction->amount)->toBe('15359.00')
+        ->and($transaction->purchase_date->toDateString())->toBe('2026-10-15')
+        ->and($transaction->payment_date->toDateString())->toBe('2026-12-20');
+
+    $this->getJson('/recurring-expenses/preview?period=2026-12')
+        ->assertSuccessful()
+        ->assertJsonPath('0.status', 'confirmed')
+        ->assertJsonPath('0.amount', '15359.00')
+        ->assertJsonPath('0.charge_date', '2026-10-15');
+});
+
+test('a future variable charge can be confirmed through the decisions endpoint', function () {
     $this->travelTo(Carbon::parse('2026-10-08'));
     $user = User::factory()->create();
     $expense = RecurringExpense::factory()->for($user)->create([
+        'amount_type' => 'variable', 'amount' => null,
         'day_of_month' => 15, 'starts_on' => '2026-10-01',
     ]);
 
     $this->actingAs($user)->postJson("/recurring-expenses/{$expense->id}/decisions", [
-        'period' => '2026-10', 'status' => 'confirmed',
-    ])->assertUnprocessable();
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 15359,
+    ])->assertCreated();
 
-    expect(Transaction::query()->count())->toBe(0);
+    expect(Transaction::query()->sole()->purchase_date->toDateString())->toBe('2026-10-15');
 });
 
 test('versioned API exposes recurring rules as resources', function () {

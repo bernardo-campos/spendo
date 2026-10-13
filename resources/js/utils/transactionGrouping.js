@@ -102,6 +102,11 @@ export const plannedPeriodLabel = (period) => {
 export const visibleCurrencyTotals = (totals) => Object.entries(totals)
     .filter(([, amount]) => Number(amount) !== 0);
 
+export const sumGroupTotals = (groups) => groups.reduce((totals, group) => ({
+    ARS: totals.ARS + group.totals.ARS,
+    USD: totals.USD + group.totals.USD,
+}), { ARS: 0, USD: 0 });
+
 export const partitionPlannedDayGroups = (groups, today, period) => {
     const planned = [];
     const other = [];
@@ -117,9 +122,6 @@ export const partitionPlannedDayGroups = (groups, today, period) => {
     return {
         planned,
         other,
-        totals: planned.reduce((totals, group) => ({
-            ARS: totals.ARS + group.totals.ARS,
-            USD: totals.USD + group.totals.USD,
-        }), { ARS: 0, USD: 0 }),
+        totals: sumGroupTotals(planned),
     };
 };

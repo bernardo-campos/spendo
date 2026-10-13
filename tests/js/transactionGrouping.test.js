@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, visibleCurrencyTotals } from '../../resources/js/utils/transactionGrouping.js';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, sumGroupTotals, visibleCurrencyTotals } from '../../resources/js/utils/transactionGrouping.js';
+import { filterTransactionsByPaymentAndCurrency } from '../../resources/js/utils/transactionFilters.js';
 
 const transactions = [
     { id: 1, amount: '100.00', currency: 'ARS', purchase_date: '2026-09-03', payment_method: 'credit', card_id: 2, card: { id: 2, name: 'Visa' } },
@@ -30,6 +31,20 @@ test('shows only currencies with amounts in each group total', () => {
     assert.deepEqual(visibleCurrencyTotals({ ARS: 40, USD: 0 }), [['ARS', 40]]);
     assert.deepEqual(visibleCurrencyTotals({ ARS: 40, USD: 25 }), [['ARS', 40], ['USD', 25]]);
     assert.deepEqual(visibleCurrencyTotals({ ARS: 0, USD: 0 }), []);
+});
+
+test('sums both currencies from filtered visible groups and excludes approximate amounts', () => {
+    const items = [
+        ...transactions,
+        { id: 6, amount: '12.00', currency: 'USD', purchase_date: '2026-09-06', payment_method: 'cash' },
+        { id: 7, amount: '100.00', currency: 'USD', purchase_date: '2026-09-07', payment_method: 'cash', is_approximate: true },
+    ];
+
+    assert.deepEqual(sumGroupTotals(groupTransactions(items, 'day')), { ARS: 235, USD: 37 });
+
+    const filtered = filterTransactionsByPaymentAndCurrency(items, ['cash'], ['USD']);
+    assert.deepEqual(sumGroupTotals(groupTransactions(filtered, 'payment_method')), { ARS: 0, USD: 12 });
+    assert.deepEqual(sumGroupTotals([]), { ARS: 0, USD: 0 });
 });
 
 test('keeps day and category grouping available', () => {

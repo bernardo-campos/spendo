@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { transactionMatchesSearch } from '@/utils/transactionSearch';
 import { filterTransactionsByPaymentAndCurrency } from '@/utils/transactionFilters';
-import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, visibleCurrencyTotals } from '@/utils/transactionGrouping';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, sumGroupTotals, visibleCurrencyTotals } from '@/utils/transactionGrouping';
 import { formatLocalDate } from '@/utils/localDate';
 
 const props = defineProps({
@@ -156,7 +156,9 @@ const paymentMethodFilterLabel = computed(() => {
 });
 
 const isSearchActive = computed(() => searchQuery.value.trim() !== '');
+const hasActiveFilters = computed(() => isFilterActive.value || isSearchActive.value || unconfirmedOnly.value);
 const groupedTransactions = computed(() => groupTransactions(filteredTransactions.value, grouping.value));
+const listTotals = computed(() => sumGroupTotals(groupedTransactions.value));
 const displayBlocks = computed(() => {
     if (grouping.value !== 'day') {
         return groupedTransactions.value.map((group) => ({ key: group.key, groups: [group], planned: false }));
@@ -300,10 +302,10 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
             <button type="button" class="rounded-md border border-amber-500 px-3 py-1.5 font-medium hover:bg-amber-100 dark:hover:bg-amber-900" :aria-pressed="unconfirmedOnly" @click="unconfirmedOnly = !unconfirmedOnly; plannedExpanded = true">{{ unconfirmedOnly ? 'Quitar filtro' : 'Ver sin confirmar' }}</button>
         </div>
 
-        <div class="rounded-none border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
-            <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
-            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:px-0 sm:pt-0 dark:text-slate-400">{{ unconfirmedOnly ? 'No hay importes sin confirmar para estos filtros.' : (isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage)) }}</p>
-            <div v-else class="space-y-5">
+        <div class="flex flex-col rounded-none border-0 bg-transparent p-0 sm:flex-row sm:flex-wrap sm:justify-end sm:rounded-lg sm:border sm:border-slate-200 sm:bg-slate-50 sm:p-4 dark:sm:border-slate-800 dark:sm:bg-slate-950">
+            <p v-if="loading" class="px-4 pt-4 text-sm text-slate-500 sm:w-full sm:px-0 sm:pt-0 dark:text-slate-400">Cargando...</p>
+            <p v-else-if="filteredTransactions.length === 0" class="px-4 pt-4 text-sm text-slate-500 sm:w-full sm:px-0 sm:pt-0 dark:text-slate-400">{{ unconfirmedOnly ? 'No hay importes sin confirmar para estos filtros.' : (isSearchActive ? 'No hay egresos que coincidan con la búsqueda.' : (isFilterActive ? 'No hay egresos para este filtro.' : emptyMessage)) }}</p>
+            <div v-else class="space-y-5 sm:w-full">
                 <section v-for="block in displayBlocks" :key="block.key">
                     <button v-if="block.planned" type="button" class="flex w-full items-baseline justify-between gap-4 rounded-md bg-secondary px-4 py-3 text-left text-sm font-semibold text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500" :aria-expanded="plannedExpanded" @click="plannedExpanded = !plannedExpanded">
                         <span class="flex items-center gap-1">
@@ -354,11 +356,16 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                 </section>
             </div>
 
-            <div class="sticky bottom-4 mt-4 flex justify-end px-4 pb-4 sm:px-0 sm:pb-0">
-                <button type="button" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="emit('create')">
-                    Registrar {{ title.toLowerCase().slice(0, -1) }}
-                </button>
+            <div v-if="!loading" class="mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm sm:mx-0 sm:min-w-0 sm:flex-1 dark:border-slate-800 dark:bg-slate-900">
+                <span class="font-semibold text-slate-900 dark:text-slate-100">Total <span v-if="hasActiveFilters" class="font-normal text-slate-500 dark:text-slate-400">[filtrado]</span></span>
+                <span class="flex flex-wrap gap-x-3 font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                    <span>{{ formatCurrencyAmount('ARS', listTotals.ARS) }}</span>
+                    <span>{{ formatCurrencyAmount('USD', listTotals.USD) }}</span>
+                </span>
             </div>
+            <button type="button" class="sticky bottom-4 z-10 mb-4 mr-4 mt-3 self-end rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 sm:mb-0 sm:ml-3 sm:mr-0 sm:mt-4 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" @click="emit('create')">
+                Registrar {{ title.toLowerCase().slice(0, -1) }}
+            </button>
         </div>
 
         <Dialog v-model:open="recurringDialogOpen">

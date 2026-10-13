@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel } from '../../resources/js/utils/transactionGrouping.js';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, visibleCurrencyTotals } from '../../resources/js/utils/transactionGrouping.js';
 
 const transactions = [
     { id: 1, amount: '100.00', currency: 'ARS', purchase_date: '2026-09-03', payment_method: 'credit', card_id: 2, card: { id: 2, name: 'Visa' } },
@@ -23,6 +23,13 @@ test('groups expenses by cash and individual card with separate currency totals'
         { key: 'payment-card-1', label: 'Mastercard', totals: { ARS: 75, USD: 0 }, ids: [3] },
         { key: 'payment-card-2', label: 'Visa', totals: { ARS: 100, USD: 25 }, ids: [4, 1] },
     ]);
+});
+
+test('shows only currencies with amounts in each group total', () => {
+    assert.deepEqual(visibleCurrencyTotals({ ARS: 0, USD: 25 }), [['USD', 25]]);
+    assert.deepEqual(visibleCurrencyTotals({ ARS: 40, USD: 0 }), [['ARS', 40]]);
+    assert.deepEqual(visibleCurrencyTotals({ ARS: 40, USD: 25 }), [['ARS', 40], ['USD', 25]]);
+    assert.deepEqual(visibleCurrencyTotals({ ARS: 0, USD: 0 }), []);
 });
 
 test('keeps day and category grouping available', () => {

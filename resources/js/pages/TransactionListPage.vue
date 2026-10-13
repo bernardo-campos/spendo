@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { transactionMatchesSearch } from '@/utils/transactionSearch';
 import { filterTransactionsByPaymentAndCurrency } from '@/utils/transactionFilters';
-import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel } from '@/utils/transactionGrouping';
+import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, visibleCurrencyTotals } from '@/utils/transactionGrouping';
 import { formatLocalDate } from '@/utils/localDate';
 
 const props = defineProps({
@@ -205,9 +205,6 @@ const transactionTypeLabel = (transaction) => {
 const shouldShowExpenseField = (transaction, preference) => transaction.type !== 'expense' || props.displayPreferences[preference];
 
 const isGroupExpanded = (key) => !props.collapsedDates.has(key);
-
-const visibleCurrencyTotals = (totals) => Object.entries(totals)
-    .filter(([currency, amount]) => currency !== 'USD' || Number(amount) !== 0);
 
 const toggleGroup = (key) => {
     const updatedCollapsedDates = new Set(props.collapsedDates);

@@ -99,6 +99,9 @@ export const plannedPeriodLabel = (period) => {
     return `Planificados en ${month}`;
 };
 
+export const visibleCurrencyTotals = (totals) => Object.entries(totals)
+    .filter(([, amount]) => Number(amount) !== 0);
+
 export const partitionPlannedDayGroups = (groups, today, period) => {
     const planned = [];
     const other = [];

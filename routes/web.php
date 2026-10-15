@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReceiptImportAddressController;
+use App\Http\Controllers\ReceiptImportSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -46,4 +47,6 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::get('receipt-import-address', [ReceiptImportAddressController::class, 'show']);
     Route::post('receipt-import-address', [ReceiptImportAddressController::class, 'store'])->middleware('throttle:6,1');
     Route::post('receipt-import-address/rotate', [ReceiptImportAddressController::class, 'rotate'])->middleware('throttle:6,1');
+    Route::get('receipt-import-settings', [ReceiptImportSettingsController::class, 'index']);
+    Route::put('receipt-import-settings/{provider}', [ReceiptImportSettingsController::class, 'update']);
 });

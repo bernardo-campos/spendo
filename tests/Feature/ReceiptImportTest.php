@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ReceiptImportService;
@@ -57,6 +58,17 @@ test('a manually forwarded Uber receipt creates one cash expense', function () {
     Storage::fake('local');
 
     $user = User::factory()->create();
+    $category = Category::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Transporte',
+        'slug' => 'transporte',
+        'scope' => 'expense',
+        'is_active' => true,
+    ]);
+    $this->actingAs($user)->putJson('/receipt-import-settings/uber', [
+        'category_id' => $category->id,
+        'place' => 'Viajes por aplicación',
+    ])->assertSuccessful();
     $address = app(ReceiptImportService::class)->addressFor($user);
     $html = '<html><body>'
         .'<td class="m_-7930254747577144633total-fare-amount">ARS&nbsp;2,348.00</td>'
@@ -87,7 +99,9 @@ test('a manually forwarded Uber receipt creates one cash expense', function () {
     $transaction = Transaction::query()->sole();
 
     expect($transaction->type)->toBe('expense')
+        ->and($transaction->category_id)->toBe($category->id)
         ->and($transaction->description)->toBe('Viaje Uber: Ushuaia → Gaucho Rivero')
+        ->and($transaction->place)->toBe('Viajes por aplicación')
         ->and($transaction->payment_method)->toBe('cash')
         ->and($transaction->amount)->toBe('2348.00')
         ->and($transaction->currency->value)->toBe('ARS')

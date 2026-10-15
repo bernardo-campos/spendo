@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -77,4 +78,83 @@ test('receipt address endpoints require a verified session', function () {
 
     $this->actingAs($user)->get('/receipt-import-address')->assertRedirect('/email/verify');
     $this->actingAs($user)->post('/receipt-import-address')->assertRedirect('/email/verify');
+});
+
+test('a user can choose an expense category for Uber receipts', function () {
+    $user = User::factory()->create();
+    $category = Category::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Transporte',
+        'slug' => 'transporte',
+        'scope' => 'expense',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/receipt-import-settings')
+        ->assertSuccessful()
+        ->assertJsonPath('providers.0.key', 'uber')
+        ->assertJsonPath('providers.0.category_id', null)
+        ->assertJsonPath('providers.0.place', 'Uber');
+
+    $this->actingAs($user)
+        ->putJson('/receipt-import-settings/uber', ['category_id' => $category->id, 'place' => '  Viajes en auto  '])
+        ->assertSuccessful()
+        ->assertJsonPath('category_id', $category->id)
+        ->assertJsonPath('place', 'Viajes en auto');
+
+    $this->actingAs($user)
+        ->getJson('/receipt-import-settings')
+        ->assertJsonPath('providers.0.category_id', $category->id)
+        ->assertJsonPath('providers.0.place', 'Viajes en auto');
+
+    $this->actingAs($user)
+        ->putJson('/receipt-import-settings/uber', ['category_id' => $category->id])
+        ->assertJsonPath('place', 'Viajes en auto');
+
+    $this->actingAs($user)
+        ->putJson('/receipt-import-settings/uber', ['category_id' => null, 'place' => ''])
+        ->assertSuccessful()
+        ->assertJsonPath('category_id', null)
+        ->assertJsonPath('place', 'Uber');
+});
+
+test('receipt category settings reject unsupported providers and invalid categories', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $otherCategory = Category::query()->create([
+        'user_id' => $otherUser->id, 'name' => 'Viajes', 'slug' => 'viajes',
+        'scope' => 'expense', 'is_active' => true,
+    ]);
+    $incomeCategory = Category::query()->create([
+        'user_id' => $user->id, 'name' => 'Salario', 'slug' => 'salario',
+        'scope' => 'income', 'is_active' => true,
+    ]);
+    $inactiveCategory = Category::query()->create([
+        'user_id' => $user->id, 'name' => 'Vieja', 'slug' => 'vieja',
+        'scope' => 'expense', 'is_active' => false,
+    ]);
+
+    $this->actingAs($user)->putJson('/receipt-import-settings/didi', ['category_id' => null])->assertNotFound();
+
+    foreach ([$otherCategory, $incomeCategory, $inactiveCategory] as $category) {
+        $this->actingAs($user)
+            ->putJson('/receipt-import-settings/uber', ['category_id' => $category->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category_id');
+    }
+
+    $this->actingAs($user)
+        ->putJson('/receipt-import-settings/uber', ['category_id' => null, 'place' => str_repeat('a', 121)])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('place');
+
+});
+
+test('receipt settings require a verified session', function () {
+    $this->getJson('/receipt-import-settings')->assertUnauthorized();
+    $this->putJson('/receipt-import-settings/uber', ['category_id' => null])->assertUnauthorized();
+
+    $user = User::factory()->unverified()->create();
+    $this->actingAs($user)->get('/receipt-import-settings')->assertRedirect('/email/verify');
 });

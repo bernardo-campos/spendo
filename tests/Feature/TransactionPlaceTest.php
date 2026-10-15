@@ -31,7 +31,7 @@ test('an expense can store and clear an optional place', function () {
     expect(Transaction::query()->findOrFail($transactionId)->place)->toBeNull();
 });
 
-test('places include each expense place once for the authenticated user', function () {
+test('places are ordered by expense frequency for the authenticated user', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
@@ -71,6 +71,28 @@ test('places include each expense place once for the authenticated user', functi
         ],
         [
             'user_id' => $user->id,
+            'type' => 'expense',
+            'description' => 'Verdulería',
+            'place' => 'GreenMarket',
+            'amount' => 600,
+            'purchase_date' => '2026-09-15',
+            'payment_date' => '2026-09-15',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'user_id' => $user->id,
+            'type' => 'expense',
+            'description' => 'Verdulería',
+            'place' => 'GreenMarket',
+            'amount' => 700,
+            'purchase_date' => '2026-09-14',
+            'payment_date' => '2026-09-14',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'user_id' => $user->id,
             'type' => 'income',
             'description' => 'Ingreso',
             'place' => 'No debe aparecer',
@@ -95,7 +117,7 @@ test('places include each expense place once for the authenticated user', functi
 
     $this->actingAs($user)->getJson('/transactions/places')
         ->assertSuccessful()
-        ->assertExactJson(['Changomas', 'GreenMarket']);
+        ->assertExactJson(['GreenMarket', 'Changomas']);
 
     Sanctum::actingAs($user);
 

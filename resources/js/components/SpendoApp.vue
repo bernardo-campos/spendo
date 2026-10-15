@@ -55,6 +55,8 @@ const savingVisualizationPreferences = ref(false);
 const receiptAddress = ref(null);
 const loadingReceiptAddress = ref(false);
 const savingReceiptAddress = ref(false);
+const receiptProviders = ref([]);
+const savingReceiptProvider = ref(null);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
 const places = ref([]);
@@ -138,12 +140,34 @@ const loadReceiptAddress = async () => {
     receiptAddress.value = null;
 
     try {
-        const response = await window.axios.get('/receipt-import-address');
-        receiptAddress.value = response.data.address;
+        const [addressResponse, settingsResponse] = await Promise.all([
+            window.axios.get('/receipt-import-address'),
+            window.axios.get('/receipt-import-settings'),
+            loadCategories(),
+            loadPlaces(),
+        ]);
+        receiptAddress.value = addressResponse.data.address;
+        receiptProviders.value = settingsResponse.data.providers;
     } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? 'No fue posible cargar la dirección de importación.';
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible cargar la configuración de importación.';
     } finally {
         loadingReceiptAddress.value = false;
+    }
+};
+
+const saveReceiptProviderSettings = async (provider, categoryId, place) => {
+    savingReceiptProvider.value = provider;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const response = await window.axios.put(`/receipt-import-settings/${provider}`, { category_id: categoryId, place });
+        receiptProviders.value = receiptProviders.value.map((item) => item.key === provider ? response.data : item);
+        successMessage.value = 'Configuración de importación guardada.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar la configuración de importación.';
+    } finally {
+        savingReceiptProvider.value = null;
     }
 };
 
@@ -859,7 +883,7 @@ const deleteTransaction = async () => {
         <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
 
         <VisualizationPage v-if="activeScreen === 'visualization'" :loading="loadingVisualizationPreferences" :preferences="expenseListDisplayPreferences" :saving="savingVisualizationPreferences" @submit="saveVisualizationPreferences" />
-        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" />
+        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :providers="receiptProviders" :categories="categories" :places="places" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" :saving-provider="savingReceiptProvider" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" @save-settings="saveReceiptProviderSettings" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

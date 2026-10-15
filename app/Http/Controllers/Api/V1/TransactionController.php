@@ -182,7 +182,9 @@ class TransactionController extends Controller
             ->whereNotNull('place')
             ->where('place', '!=', '')
             ->select('place')
-            ->distinct()
+            ->selectRaw('COUNT(*) as usage_count')
+            ->groupBy('place')
+            ->orderByDesc('usage_count')
             ->orderBy('place')
             ->pluck('place');
 

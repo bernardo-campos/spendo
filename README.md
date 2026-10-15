@@ -162,12 +162,19 @@ Archivo de configuración propio:
 - `config/spendo.php`
 
 Variables de entorno disponibles:
-- `SPENDO_CURRENCY` (default: `USD`)
-- `SPENDO_CURRENCY_SYMBOL` (default: `$`)
+- `RECEIPT_IMPORT_DOMAIN`: dominio de las direcciones de importación de recibos;
+  debe coincidir con el configurado en Postfix.
+- `SPENDO_CURRENCY` (default: `USD`) y `SPENDO_CURRENCY_SYMBOL` (default: `$`):
+  se cargan en `config/spendo.php`, pero actualmente ningún flujo de la
+  aplicación utiliza esos valores. Cambiarlos no modifica la moneda ni los
+  símbolos mostrados en la interfaz.
 - `TURNSTILE_SITE_KEY`: clave pública del widget de Cloudflare Turnstile.
 - `TURNSTILE_SECRET_KEY`: clave privada utilizada únicamente por el servidor.
 - `TURNSTILE_EXPECTED_HOSTNAME`: hostname esperado en la validación de
   Turnstile. Si se omite, se obtiene de `APP_URL`.
+
+**TODO:** decidir si `SPENDO_CURRENCY` y `SPENDO_CURRENCY_SYMBOL` deben
+tener un uso concreto o eliminarse de la configuración.
 
 El registro aplica una política *fail-closed*: no crea el usuario si Turnstile
 rechaza el token, la configuración está incompleta o Cloudflare no está

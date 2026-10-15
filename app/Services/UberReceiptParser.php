@@ -170,7 +170,7 @@ class UberReceiptParser
         $values = [];
 
         foreach ($xpath->query('//*[contains(@class, "'.$class.'")]') as $node) {
-            if (! preg_match('/(?:^|\s)(?:m_\d+)?'.preg_quote($class, '/').'(?=\s|$)/', $node->getAttribute('class'))) {
+            if (! preg_match('/(?:^|\s)(?:m_-?\d+)?'.preg_quote($class, '/').'(?=\s|$)/', $node->getAttribute('class'))) {
                 continue;
             }
 

@@ -59,9 +59,9 @@ test('a manually forwarded Uber receipt creates one cash expense', function () {
     $user = User::factory()->create();
     $address = app(ReceiptImportService::class)->addressFor($user);
     $html = '<html><body>'
-        .'<td class="m_123total-fare-amount">ARS&nbsp;2,348.00</td>'
-        .'<td class="m_123address-point-desc">Ushuaia</td>'
-        .'<td class="m_123address-point-desc"><a href="https://example.test/map">Gaucho Rivero</a></td>'
+        .'<td class="m_-7930254747577144633total-fare-amount">ARS&nbsp;2,348.00</td>'
+        .'<td class="m_-7930254747577144633address-point-desc">Ushuaia</td>'
+        .'<td class="m_-7930254747577144633address-point-desc"><a href="https://example.test/map">Gaucho Rivero</a></td>'
         .'<td><a href="https://click.uber.com/f/a/receipt-one"></a>Descargar&nbsp;PDF</td>'
         .'</body></html>';
     $message = "Date: Thu, 15 Oct 2026 02:29:14 -0300\r\nContent-Type: multipart/alternative; boundary=\"receipt-boundary\"\r\n\r\n"
@@ -119,6 +119,44 @@ test('a manually forwarded Uber receipt creates one cash expense', function () {
 
     fclose($input);
     fclose($secondInput);
+});
+
+test('a previously pending receipt is imported when delivered again after parser support is added', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $service = app(ReceiptImportService::class);
+    $address = $service->addressFor($user);
+    $html = '<td class="m_-7930254747577144633total-fare-amount">ARS&nbsp;2,348.00</td>'
+        .'<a href="https://click.uber.com/f/a/pending-receipt">Descargar PDF</a>';
+    $message = "Date: Thu, 15 Oct 2026 03:42:37 -0300\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
+    $hash = hash('sha256', $message);
+    $path = "inbound-receipts/{$user->id}/{$hash}.eml";
+    Storage::disk('local')->put($path, $message);
+    DB::table('inbound_receipts')->insert([
+        'user_id' => $user->id,
+        'recipient' => $address,
+        'content_sha256' => $hash,
+        'storage_path' => $path,
+        'status' => 'pending',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $input = fopen('php://temp', 'w+');
+    fwrite($input, $message);
+    rewind($input);
+    $service->ingest($address, $input);
+
+    $this->assertDatabaseHas('inbound_receipts', [
+        'user_id' => $user->id,
+        'status' => 'imported',
+        'amount' => '2348.00',
+        'source_key' => hash('sha256', 'https://click.uber.com/f/a/pending-receipt'),
+    ]);
+    expect(Transaction::query()->count())->toBe(1);
+
+    fclose($input);
 });
 
 test('a receipt without a stable Uber identifier stays pending', function () {

@@ -116,9 +116,13 @@ class ReceiptImportService
                 throw new RuntimeException('No se pudo recuperar el recibo entrante.');
             }
 
-            if ($receipt->source_key === null && ($parsed['source_key'] ?? null) !== null) {
+            if ($receipt->status === 'pending' && $parsed !== null) {
                 DB::table('inbound_receipts')->where('id', $receipt->id)->update([
-                    'source_key' => $parsed['source_key'],
+                    'source_key' => $parsed['source_key'] ?? $receipt->source_key,
+                    'currency' => $parsed['currency'],
+                    'amount' => $parsed['amount'],
+                    'origin_address' => $parsed['origin_address'],
+                    'destination_address' => $parsed['destination_address'],
                     'updated_at' => now(),
                 ]);
             }

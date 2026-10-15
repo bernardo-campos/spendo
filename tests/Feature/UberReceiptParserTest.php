@@ -52,6 +52,28 @@ test('it extracts the total and route after Gmail forwards the receipt as multip
     ]);
 });
 
+test('it recognizes Gmail class prefixes with a negative message identifier', function () {
+    $html = <<<'HTML'
+    <html><body>
+        <td class="m_-7930254747577144633total-fare-amount">ARS&nbsp;2,348.00</td>
+        <td class="m_-7930254747577144633address-point-desc">Ushuaia, Santiago del Estero</td>
+        <td class="m_-7930254747577144633address-point-desc">Gaucho Rivero, Santiago del Estero</td>
+        <a href="https://click.uber.com/f/a/receipt-negative-prefix">Descargar&nbsp;PDF</a>
+    </body></html>
+    HTML;
+    $message = "Date: Thu, 15 Oct 2026 03:42:37 -0300\r\n"
+        ."Content-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
+
+    expect(app(UberReceiptParser::class)->parse($message))->toBe([
+        'currency' => 'ARS',
+        'amount' => '2348.00',
+        'origin_address' => 'Ushuaia, Santiago del Estero',
+        'destination_address' => 'Gaucho Rivero, Santiago del Estero',
+        'source_key' => hash('sha256', 'https://click.uber.com/f/a/receipt-negative-prefix'),
+        'purchase_date' => '2026-10-15',
+    ]);
+});
+
 test('it leaves unsupported messages unparsed', function () {
     $parser = app(UberReceiptParser::class);
 

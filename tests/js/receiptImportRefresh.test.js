@@ -30,6 +30,7 @@ test('a direct receipt import page load initializes its address, settings, and p
         activeScreen: { value: 'receipt-import' },
         errorMessage,
         loadCategories: async () => {},
+        loadReceiptVerifications: async () => {},
         loadingReceiptAddress,
         offlineClient: { get: async () => ({ data: ['Uber', 'Centro'] }) },
         places,

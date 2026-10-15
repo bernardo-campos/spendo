@@ -8,8 +8,10 @@ const MUTATIONS = 'mutations';
 const STORE = 'store';
 
 const userId = ref(null);
-const syncState = ref({ status: navigator.onLine ? 'synced' : 'offline', pending: 0, failed: 0, failedMessages: [] });
+const syncState = ref({ status: navigator.onLine ? 'synced' : 'offline', pending: 0, failed: 0, failedMessages: [], validationError: '' });
 let databasePromise;
+let syncPromise;
+let syncRequested = false;
 
 const offlineError = () => Object.assign(new Error('Estos datos todavía no se descargaron en este dispositivo.'), { offlineUnavailable: true });
 const uuid = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -482,7 +484,7 @@ const applyOptimisticMutation = async (method, url, payload) => {
         if (route.type === 'billing-cycles' && existing) {
             await updateCachedCardCycles(route.parentId, existing, true);
         }
-        return { item: existing, localId: route.id };
+        return { item: existing, localId: route.id, previousItem: route.type === 'billing-cycles' ? existing : null };
     }
 
     if (route.type === 'transactions') {
@@ -504,7 +506,7 @@ const applyOptimisticMutation = async (method, url, payload) => {
         await updateCachedCardCycles(route.parentId, item);
     }
 
-    return { item, localId: id };
+    return { item, localId: id, previousItem: route.type === 'billing-cycles' ? existing : null };
 };
 
 const compactMutation = async (mutation) => {
@@ -565,7 +567,46 @@ const updateSyncState = async (status = navigator.onLine ? 'synced' : 'offline')
         failedMessages: mutations
             .filter((mutation) => mutation.status === 'failed')
             .map((mutation) => mutation.errorMessage),
+        validationError: syncState.value.validationError,
     };
+};
+
+const rollbackBillingCycle = async (mutation) => {
+    const route = routeInfo(mutation.url);
+
+    if (mutation.method === 'post') {
+        await removeRecord('billing-cycles', mutation.localId);
+        await updateCachedCardCycles(route.parentId, { id: mutation.localId }, true);
+        return;
+    }
+
+    if (mutation.previousItem) {
+        await writeRecord('billing-cycles', mutation.previousItem);
+        await updateCachedCardCycles(route.parentId, mutation.previousItem);
+        return;
+    }
+
+    const response = await window.axios.get(`/cards/${route.parentId}`);
+    await writeRecord('cards', response.data);
+};
+
+const discardPreviousBillingCycleValidationErrors = async () => {
+    if (! navigator.onLine) {
+        return;
+    }
+
+    const rejectedCycles = (await mutationValues()).filter((mutation) => mutation.status === 'failed'
+        && routeInfo(mutation.url).type === 'billing-cycles'
+        && (mutation.statusCode === 422 || /closing[ _]date.*(registrado|taken)/i.test(mutation.errorMessage ?? '')));
+
+    for (const mutation of rejectedCycles) {
+        try {
+            await rollbackBillingCycle(mutation);
+            await deleteMutation(mutation.id);
+        } catch {
+            break;
+        }
+    }
 };
 
 const reconcile = async (mutation, data) => {
@@ -612,7 +653,7 @@ const reconcile = async (mutation, data) => {
     }
 };
 
-const sync = async () => {
+const processSync = async () => {
     if (! userId.value || ! navigator.onLine) {
         await updateSyncState('offline');
         return;
@@ -650,7 +691,25 @@ const sync = async () => {
                 break;
             }
 
+            if (error.response.status === 422 && routeInfo(mutation.url).type === 'billing-cycles') {
+                try {
+                    await rollbackBillingCycle(mutation);
+                    await deleteMutation(mutation.id);
+                    syncState.value = {
+                        ...syncState.value,
+                        validationError: error.response.data?.errors?.closing_date?.[0]
+                            ?? error.response.data?.errors?.due_date?.[0]
+                            ?? error.response.data?.message
+                            ?? 'No fue posible guardar el ciclo de facturación.',
+                    };
+                    continue;
+                } catch {
+                    // Keep the rejected change available if the local rollback fails.
+                }
+            }
+
             mutation.status = 'failed';
+            mutation.statusCode = error.response.status;
             mutation.errorMessage = error.response?.data?.message ?? 'La sincronización fue rechazada por el servidor.';
             await putMutation(mutation);
         }
@@ -659,12 +718,34 @@ const sync = async () => {
     await updateSyncState(navigator.onLine ? 'synced' : 'offline');
 };
 
+const sync = () => {
+    if (syncPromise) {
+        syncRequested = true;
+        return syncPromise;
+    }
+
+    syncPromise = processSync().finally(() => {
+        syncPromise = null;
+
+        if (syncRequested) {
+            syncRequested = false;
+            void sync();
+        }
+    });
+
+    return syncPromise;
+};
+
 const retry = async () => {
     const mutations = await mutationValues();
     await Promise.all(mutations
         .filter((mutation) => mutation.status === 'failed')
         .map((mutation) => putMutation({ ...mutation, status: 'pending', errorMessage: undefined })));
     await sync();
+};
+
+const clearValidationError = () => {
+    syncState.value = { ...syncState.value, validationError: '' };
 };
 
 const refresh = async (url, config) => {
@@ -712,6 +793,7 @@ const mutate = async (method, url, payload = undefined) => {
             url,
             payload: storedPayload,
             localId: optimistic.localId,
+            previousItem: optimistic.previousItem,
             status: 'pending',
             createdAt: new Date().toISOString(),
         };
@@ -720,6 +802,9 @@ const mutate = async (method, url, payload = undefined) => {
             await putMutation(mutation);
         }
 
+        if (routeInfo(url).type === 'billing-cycles') {
+            syncState.value = { ...syncState.value, validationError: '' };
+        }
         await updateSyncState(navigator.onLine ? 'pending' : 'offline');
         void sync();
 
@@ -755,6 +840,7 @@ const initialize = async (id) => {
 
     userId.value = nextUserId;
     await setValue(activeUserKey, nextUserId);
+    await discardPreviousBillingCycleValidationErrors();
     await updateSyncState();
     void sync();
 
@@ -796,7 +882,7 @@ const clear = async () => {
         tx.onerror = () => reject(tx.error);
     });
     userId.value = null;
-    syncState.value = { status: 'synced', pending: 0, failed: 0, failedMessages: [] };
+    syncState.value = { status: 'synced', pending: 0, failed: 0, failedMessages: [], validationError: '' };
 };
 
-export const offlineClient = { clear, get, initialize, mutate, retry, sync, syncState };
+export const offlineClient = { clear, clearValidationError, get, initialize, mutate, retry, sync, syncState };

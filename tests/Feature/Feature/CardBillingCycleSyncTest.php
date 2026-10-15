@@ -9,6 +9,45 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+test('a duplicate billing cycle returns a clear validation message', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+    $existingCycle = $card->billingCycles()->create([
+        'closing_date' => '2026-10-24',
+        'due_date' => '2026-11-05',
+    ]);
+    $otherCycle = $card->billingCycles()->create([
+        'closing_date' => '2026-11-20',
+        'due_date' => '2026-12-03',
+    ]);
+    $message = 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.';
+
+    $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-05',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.closing_date.0', $message);
+
+    $this->actingAs($user)
+        ->putJson("/cards/{$card->id}/billing-cycles/{$otherCycle->id}", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-05',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.closing_date.0', $message);
+
+    expect($existingCycle->fresh()->closing_date->toDateString())->toBe('2026-10-24');
+});
+
 test('installments start with estimated due dates and are updated to real due dates when billing cycles are loaded', function () {
     $user = User::factory()->create();
 

@@ -361,10 +361,12 @@ const {
 });
 
 const {
+    billingCycleErrors,
     billingCycleForms,
     cardForm,
     categoryForm,
     categoryScopeLabel,
+    clearBillingCycleError,
     editBillingCycle,
     editCard,
     editCategory,
@@ -707,6 +709,14 @@ watch(
 );
 
 watch(() => offlineSyncState.value.status, async (status) => {
+    if (offlineSyncState.value.failed > 0 || offlineSyncState.value.validationError) {
+        successMessage.value = '';
+    }
+
+    if (offlineSyncState.value.validationError && activeScreen.value === 'cards') {
+        await runWithLoading(() => loadCards({ fresh: true }), 'No fue posible cargar las tarjetas.');
+    }
+
     if (status === 'synced' && offlineSyncState.value.pending === 0 && offlineSyncState.value.failed === 0) {
         invalidateTransactions();
         await runWithLoading(() => loadTransactions({ force: true }), 'No fue posible actualizar las transacciones.');
@@ -723,6 +733,7 @@ watch(
     () => activeScreen.value,
     () => {
         successMessage.value = '';
+        offlineClient.clearValidationError();
         closeUserMenu();
     }
 );
@@ -909,7 +920,7 @@ const deleteTransaction = async () => {
 
         <CurrencyExchangeFormPage v-if="activeScreen === 'transaction-form' && form.type === 'exchange'" :form="exchangeForm" :currencies="CURRENCY_OPTIONS" :categories="categories" :tags="tags" :format-amount="formatAmount" :editing="editingTransactionId !== null" :saving="savingTransaction" :deleting="deletingTransaction" :has-suggestion="hasExchangeSuggestion" @back="returnFromExchange" @submit="submitExchange" @delete="deleteExchange" @change-type="changeExchangeType" @source-input="suggestExchangeAmount('source')" @target-input="suggestExchangeAmount('target')" />
 
-        <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
+        <CardsPage v-if="activeScreen === 'cards'" :billing-cycle-errors="billingCycleErrors" :billing-cycle-forms="billingCycleForms" :card-form="cardForm" :cards="cards" :format-date="formatDate" :get-billing-cycle-form="getBillingCycleForm" :saving-billing-cycle="savingBillingCycle" :saving-card="savingCard" @clear-billing-cycle-error="clearBillingCycleError" @edit-billing-cycle="editBillingCycle" @edit-card="editCard" @remove-billing-cycle="removeBillingCycle" @remove-card="removeCard" @reset-billing-cycle="resetBillingCycleForm" @reset-card="resetCardForm" @submit-billing-cycle="submitBillingCycle" @submit-card="submitCard" />
 
         <CategoriesPage v-if="activeScreen === 'categories'" :categories="categories" :form="categoryForm" :saving="savingCategory" :scope-label="categoryScopeLabel" @edit="editCategory" @remove="removeCategory" @reset="resetCategoryForm" @submit="submitCategory" />
 

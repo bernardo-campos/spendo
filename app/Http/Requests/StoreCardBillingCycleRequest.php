@@ -36,4 +36,14 @@ class StoreCardBillingCycleRequest extends FormRequest
             'due_date' => ['required', 'date', 'after_or_equal:closing_date'],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'closing_date.unique' => 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.',
+        ];
+    }
 }

@@ -73,6 +73,13 @@ const emit = defineEmits(['navigate', 'retry-sync', 'set-sidebar-open', 'toggle-
             </AdminHeader>
 
             <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
+                <div v-if="syncState.failed > 0 || syncState.validationError" role="alert" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                    <p class="font-medium">No se pudieron guardar algunos cambios.</p>
+                    <ul class="list-disc pl-5">
+                        <li v-if="syncState.validationError">{{ syncState.validationError }}</li>
+                        <li v-for="(message, index) in syncState.failedMessages" :key="index">{{ message }}</li>
+                    </ul>
+                </div>
                 <slot />
             </main>
         </div>

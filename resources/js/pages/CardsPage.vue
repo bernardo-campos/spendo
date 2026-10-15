@@ -12,6 +12,7 @@ import {
 import { billingCyclesAroundToday, billingCyclesForCard } from '@/utils/billingCycles';
 
 defineProps({
+    billingCycleErrors: { type: Object, required: true },
     billingCycleForms: { type: Object, required: true },
     cardForm: { type: Object, required: true },
     cards: { type: Array, required: true },
@@ -21,7 +22,7 @@ defineProps({
     savingCard: { type: Boolean, required: true },
 });
 
-const emit = defineEmits(['edit-billing-cycle', 'edit-card', 'remove-billing-cycle', 'remove-card', 'reset-billing-cycle', 'reset-card', 'submit-billing-cycle', 'submit-card']);
+const emit = defineEmits(['clear-billing-cycle-error', 'edit-billing-cycle', 'edit-card', 'remove-billing-cycle', 'remove-card', 'reset-billing-cycle', 'reset-card', 'submit-billing-cycle', 'submit-card']);
 const showCardForm = ref(false);
 const cyclesDialogOpen = ref(false);
 const selectedCardForCycles = ref(null);
@@ -83,9 +84,10 @@ const closeCardForm = () => {
                 <p v-if="billingCyclesAroundToday(card).length === 0" class="mb-2 text-xs text-slate-500 dark:text-slate-400">No fue posible calcular ciclos para esta tarjeta.</p>
                 <ul v-else class="mb-3 space-y-1"><li v-for="entry in billingCyclesAroundToday(card)" :key="entry.cycle.id" class="flex flex-col items-start gap-2 py-2 text-xs sm:flex-row sm:items-center sm:justify-between sm:rounded-md sm:border sm:border-slate-200 sm:px-2 sm:py-1 dark:sm:border-slate-700"><span><span class="mr-1 text-slate-500 dark:text-slate-400">{{ entry.label }}:</span>Cierre {{ formatDate(entry.cycle.closing_date) }} · Vence {{ formatDate(entry.cycle.due_date) }} <span v-if="entry.cycle.is_estimated" class="text-slate-500 dark:text-slate-400">(estimado)</span></span><span v-if="!entry.cycle.is_estimated" class="flex shrink-0 gap-1"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700" @click="emit('edit-billing-cycle', card.id, entry.cycle)">Editar ciclo</button><button type="button" class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700" @click="emit('remove-billing-cycle', card.id, entry.cycle.id)">Eliminar</button></span></li></ul>
                 <form class="grid gap-2 sm:grid-cols-3" @submit.prevent="emit('submit-billing-cycle', card.id)">
-                    <label class="block space-y-1 text-xs"><span class="font-medium">Fecha de cierre</span><input v-model="getBillingCycleForm(card.id).closing_date" type="date" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950"></label>
-                    <label class="block space-y-1 text-xs"><span class="font-medium">Fecha de vencimiento</span><input v-model="getBillingCycleForm(card.id).due_date" type="date" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950"></label>
+                    <label class="block space-y-1 text-xs"><span class="font-medium">Fecha de cierre</span><input v-model="getBillingCycleForm(card.id).closing_date" type="date" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" @input="emit('clear-billing-cycle-error', card.id)"></label>
+                    <label class="block space-y-1 text-xs"><span class="font-medium">Fecha de vencimiento</span><input v-model="getBillingCycleForm(card.id).due_date" type="date" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" @input="emit('clear-billing-cycle-error', card.id)"></label>
                     <div class="flex gap-2"><button type="submit" :disabled="savingBillingCycle" class="flex-1 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">{{ getBillingCycleForm(card.id).id === null ? 'Agregar ciclo' : 'Actualizar ciclo' }}</button><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-xs dark:border-slate-700" @click="emit('reset-billing-cycle', card.id)">Limpiar</button></div>
+                    <p v-if="billingCycleErrors[card.id]" role="alert" class="text-xs text-red-700 sm:col-span-3 dark:text-red-300">{{ billingCycleErrors[card.id] }}</p>
                 </form>
             </section>
         </div>

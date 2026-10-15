@@ -37,4 +37,14 @@ class UpdateCardBillingCycleRequest extends FormRequest
             'due_date' => ['sometimes', 'date'],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'closing_date.unique' => 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.',
+        ];
+    }
 }

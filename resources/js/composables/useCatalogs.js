@@ -23,8 +23,8 @@ export const useCatalogs = () => {
         tags.value = response.data;
     };
 
-    const loadCards = async () => {
-        const response = await offlineClient.get('/cards');
+    const loadCards = async ({ fresh = false } = {}) => {
+        const response = await offlineClient.get('/cards', { fresh });
         cards.value = response.data;
     };
 

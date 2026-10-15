@@ -308,12 +308,6 @@ const {
     setActiveScreenFromMenu: navigateToScreen,
 } = useNavigation({ form });
 
-watch(activeScreen, (screen) => {
-    if (screen === 'receipt-import') {
-        void loadReceiptAddress();
-    }
-}, { immediate: true });
-
 const {
     categoryOptions,
     firstInstallmentPaymentDate,
@@ -430,6 +424,12 @@ const loadPlaces = async () => {
 
     places.value = response.data;
 };
+
+watch(activeScreen, (screen) => {
+    if (screen === 'receipt-import') {
+        void loadReceiptAddress();
+    }
+}, { immediate: true });
 
 const loadRecurringPreview = async () => {
     const period = selectedPeriod.value;

@@ -35,14 +35,114 @@ un gasto.
 
 El reenvío probado llega como `multipart/alternative`: el parser lee su parte
 HTML y reconoce las clases que Gmail conserva con un prefijo. Otros clientes
-de correo pueden generar formatos distintos. Esta etapa todavía no configura
-Postfix. La pantalla permite obtener la dirección, pero el envío real comenzará
-a funcionar cuando Postfix entregue los mensajes al comando de Laravel. La
-prueba siguiente simula localmente la entrega
-de Postfix al comando de Laravel; no necesita enviar un correo real ni
-modificar el servidor.
+de correo pueden generar formatos distintos. La prueba local siguiente simula
+la entrega de Postfix al comando de Laravel, sin enviar un correo real ni
+modificar el servidor. La configuración de un servidor está más abajo.
 El campo `From` del ejemplo se conserva dentro del mensaje, pero aún no se usa
 para identificar al usuario.
+
+## Configurar un dominio receptor y Postfix en Linux
+
+Este ejemplo usa `recibos.ejemplo.com` para las direcciones de importación y
+`mail.ejemplo.com` como servidor de correo. Sustituir ambos nombres, la IP, el
+usuario de Linux y la ruta de la aplicación por los propios. No sustituir la
+configuración de otros dominios que ya atienda el mismo Postfix: incorporar
+este dominio a los parámetros correspondientes.
+
+1. Crear los registros DNS y permitir conexiones TCP entrantes al puerto 25
+   en el firewall del proveedor y del servidor:
+
+   ```dns
+   mail.ejemplo.com.     IN A  203.0.113.10
+   recibos.ejemplo.com.  IN MX 10 mail.ejemplo.com.
+   ```
+
+   Si se publica un registro `AAAA` para `mail.ejemplo.com`, IPv6 también
+   debe llegar al servidor. Comprobar la resolución desde fuera con
+   `dig MX recibos.ejemplo.com` y `dig A mail.ejemplo.com`.
+
+2. Definir `RECEIPT_IMPORT_DOMAIN=recibos.ejemplo.com` en el `.env` de
+   Laravel. Ese valor determina el dominio de las direcciones que muestra la
+   interfaz y acepta `receipts:ingest`. Si la configuración de Laravel está
+   cacheada, ejecutar `php artisan config:cache` desde la aplicación.
+
+3. En `/etc/postfix/main.cf`, configurar el dominio virtual, la lista de
+   destinatarios válidos y la ruta de entrega:
+
+   ```ini
+   virtual_mailbox_domains = recibos.ejemplo.com
+   virtual_mailbox_maps = regexp:/etc/postfix/spendo_recipients
+   transport_maps = hash:/etc/postfix/spendo_transport
+   spendoreceipts_destination_recipient_limit = 1
+   ```
+
+   No incluir `recibos.ejemplo.com` en `mydestination` ni en
+   `virtual_alias_domains`. `virtual_mailbox_maps` se usa aquí para validar
+   destinatarios; la entrega final la hará el transporte `spendoreceipts`.
+   Si hay otros mapas o dominios configurados, conservarlos al añadir estos
+   valores.
+
+4. Crear `/etc/postfix/spendo_recipients` con una regla para el formato que
+   genera Laravel:
+
+   ```text
+   /^importar\+[0-9a-f]{40}@recibos\.ejemplo\.com$/ OK
+   ```
+
+   Este mapa `regexp:` no requiere compilarse con `postmap`. Acepta cualquier
+   dirección con un token de 40 caracteres hexadecimales; no comprueba si el
+   token existe en `users`. Una dirección que no coincide normalmente se
+   rechaza durante `RCPT TO`, antes de recibir el cuerpo del correo. Una que
+   coincide pero tiene un token desconocido se rechaza después, cuando Laravel
+   intenta identificar al usuario.
+
+5. Crear `/etc/postfix/spendo_transport` para dirigir el dominio al transporte:
+
+   ```text
+   recibos.ejemplo.com spendoreceipts:
+   ```
+
+   Compilar este mapa `hash:` con `sudo postmap /etc/postfix/spendo_transport`.
+   Repetir ese comando cada vez que se modifique el archivo.
+
+6. Añadir a `/etc/postfix/master.cf` el transporte que ejecuta Laravel. La
+   segunda línea debe comenzar con espacios y `appuser` debe ser un usuario
+   existente con acceso de lectura a la aplicación y de escritura a su
+   almacenamiento y caché:
+
+   ```text
+   spendoreceipts unix - n n - - pipe
+     flags=Rq user=appuser:appuser argv=/usr/bin/php /srv/spendo/artisan receipts:ingest ${recipient}
+   ```
+
+   Postfix reemplaza `${recipient}` por el destinatario del sobre SMTP y lo
+   pasa como argumento. El mensaje completo entra por `STDIN`; no se lee una
+   casilla IMAP ni se crea un buzón por usuario. El límite de destinatarios del
+   paso 3 hace una ejecución del comando por destinatario.
+
+7. Comprobar la configuración y recargar Postfix:
+
+   ```bash
+   sudo postmap -q 'importar+0000000000000000000000000000000000000000@recibos.ejemplo.com' regexp:/etc/postfix/spendo_recipients
+   sudo postmap -q 'otro@recibos.ejemplo.com' regexp:/etc/postfix/spendo_recipients
+   sudo postmap -q 'recibos.ejemplo.com' hash:/etc/postfix/spendo_transport
+   sudo postconf -M spendoreceipts/unix
+   sudo postfix check
+   sudo postfix reload
+   ```
+
+   La primera consulta debe devolver `OK`, la segunda no debe devolver nada y
+   la tercera debe devolver `spendoreceipts:`. La consulta a `postconf` debe
+   mostrar el servicio `pipe` del paso 6. Finalmente, enviar un correo desde
+   una cuenta externa a una dirección generada en la interfaz, comprobar el
+   registro en `inbound_receipts` y consultar los registros de correo y
+   `mailq` si falla. El destinatario se toma del sobre SMTP, no de la cabecera
+   `To:` ni del remitente `From:`.
+
+Referencias: [dominios y destinatarios virtuales](https://www.postfix.org/VIRTUAL_README.html),
+[mapas de expresiones regulares](https://www.postfix.org/regexp_table.5.html),
+[mapas de transporte](https://www.postfix.org/transport.5.html) y
+[entrega mediante `pipe`](https://www.postfix.org/pipe.8.html).
 
 ## Prueba manual local en PowerShell
 

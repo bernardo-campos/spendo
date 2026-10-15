@@ -30,15 +30,20 @@ const addMonthsNoOverflow = (date, months) => {
 
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
 
-const statementMonthForPurchase = (purchase, closingDay) => purchase.day <= closingDay
-    ? { year: purchase.year, month: purchase.month }
-    : addMonthNoOverflow({ year: purchase.year, month: purchase.month });
-
 const monthKey = ({ year, month }) => `${year}-${String(month).padStart(2, '0')}`;
 
 const cycleForStatementMonth = (billingCycles, statementMonth) => billingCycles.find((cycle) => (
     String(cycle.closing_date).slice(0, 7) === monthKey(statementMonth)
 ));
+
+const statementMonthForPurchase = (purchase, closingDay, billingCycles) => {
+    const purchaseMonth = { year: purchase.year, month: purchase.month };
+    const realClosingDay = toDateParts(cycleForStatementMonth(billingCycles, purchaseMonth)?.closing_date)?.day;
+
+    return purchase.day <= (realClosingDay ?? closingDay)
+        ? purchaseMonth
+        : addMonthNoOverflow(purchaseMonth);
+};
 
 export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
     const purchase = toDateParts(purchaseDate);
@@ -51,7 +56,7 @@ export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
         ? [...card.billing_cycles].sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)))
         : [];
     const closingDay = Number(card.closing_day) || 1;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay);
+    const statementMonth = statementMonthForPurchase(purchase, closingDay, billingCycles);
     const matchedCycle = cycleForStatementMonth(billingCycles, statementMonth);
 
     if (matchedCycle?.due_date) {
@@ -76,7 +81,7 @@ export const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
     }
 
     const closingDay = Number(card.closing_day) || 1;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay);
+    const statementMonth = statementMonthForPurchase(purchase, closingDay, card.billing_cycles ?? []);
 
     return Array.isArray(card.billing_cycles)
         && cycleForStatementMonth(card.billing_cycles, statementMonth) !== undefined;
@@ -91,26 +96,27 @@ export const buildInstallmentPreview = (totalAmount, installmentsCount, purchase
         return [];
     }
 
-    const firstDueDate = calculateFirstInstallmentPaymentDate(purchaseDate, card);
     const billingCycles = Array.isArray(card.billing_cycles) ? [...card.billing_cycles] : [];
-    const firstDueDateParts = toDateParts(firstDueDate);
+    const closingDay = Number(card.closing_day) || 1;
+    const dueDay = Number(card.due_day) || closingDay;
+    const statementMonth = statementMonthForPurchase(purchase, closingDay, billingCycles);
     const baseCents = Math.floor(totalCents / count);
     let remainingCents = totalCents;
 
-    if (firstDueDateParts === null) {
-        return [];
-    }
-
     return Array.from({ length: count }, (_, index) => {
         const amountCents = index === count - 1 ? remainingCents : baseCents;
-        const closingDay = Number(card.closing_day) || 1;
-        const statementMonth = statementMonthForPurchase(purchase, closingDay);
+        const installmentStatementMonth = addMonthsNoOverflow({ ...statementMonth, day: 1 }, index);
         const cycle = cycleForStatementMonth(
             billingCycles,
-            addMonthsNoOverflow({ ...statementMonth, day: 1 }, index),
+            installmentStatementMonth,
         );
-        const estimatedDate = addMonthsNoOverflow(firstDueDateParts, index);
-        const dueDate = cycle?.due_date ?? formatDateParts(estimatedDate);
+        const dueMonth = closingDay === dueDay
+            ? installmentStatementMonth
+            : addMonthNoOverflow(installmentStatementMonth);
+        const dueDate = cycle?.due_date ?? formatDateParts({
+            ...dueMonth,
+            day: Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month)),
+        });
 
         remainingCents -= amountCents;
 

@@ -1,4 +1,4 @@
-import { formatLocalDate } from './localDate';
+import { formatLocalDate } from './localDate.js';
 
 const formatDateParts = ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -47,16 +47,16 @@ export const billingCyclesForCard = (card, monthsAroundToday = 12) => {
 
         return buildEstimatedCycle(card, referenceDate);
     }).filter(Boolean);
-    const cyclesByClosingDate = new Map(estimatedCycles.map((cycle) => [cycle.closing_date, cycle]));
+    const cyclesByMonth = new Map(estimatedCycles.map((cycle) => [cycle.closing_date.slice(0, 7), cycle]));
 
     (Array.isArray(card.billing_cycles) ? card.billing_cycles : []).forEach((cycle) => {
-        cyclesByClosingDate.set(String(cycle.closing_date).slice(0, 10), {
+        cyclesByMonth.set(String(cycle.closing_date).slice(0, 7), {
             ...cycle,
             is_estimated: false,
         });
     });
 
-    return [...cyclesByClosingDate.values()]
+    return [...cyclesByMonth.values()]
         .sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)));
 };
 

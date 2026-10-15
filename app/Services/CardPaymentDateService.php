@@ -24,19 +24,8 @@ class CardPaymentDateService
         }
 
         $closingDay = $card->closing_day ?? 1;
-        $statementMonth = $purchase->day <= $closingDay
-            ? $purchase->startOfMonth()
-            : $purchase->addMonthNoOverflow()->startOfMonth();
-
-        $cycle = $card->relationLoaded('billingCycles')
-            ? $card->billingCycles
-                ->sortBy('closing_date')
-                ->first(fn (CardBillingCycle $billingCycle): bool => $billingCycle->closing_date->format('Y-m') === $statementMonth->format('Y-m'))
-            : $card->billingCycles()
-                ->whereYear('closing_date', $statementMonth->year)
-                ->whereMonth('closing_date', $statementMonth->month)
-                ->orderBy('closing_date')
-                ->first();
+        $statementMonth = $this->statementMonthForPurchase($purchase, $card);
+        $cycle = $this->cycleForMonth($card, $statementMonth);
 
         if ($cycle !== null) {
             return [
@@ -57,5 +46,30 @@ class CardPaymentDateService
             'date' => $dueMonth->setDay($safeDueDay)->toDateString(),
             'is_estimated' => true,
         ];
+    }
+
+    public function statementMonthForPurchase(CarbonImmutable $purchase, Card $card): CarbonImmutable
+    {
+        $purchaseMonth = $purchase->startOfMonth();
+        $closingDay = $this->cycleForMonth($card, $purchaseMonth)?->closing_date->day
+            ?? $card->closing_day
+            ?? 1;
+
+        return $purchase->day <= $closingDay
+            ? $purchaseMonth
+            : $purchaseMonth->addMonthNoOverflow();
+    }
+
+    private function cycleForMonth(Card $card, CarbonImmutable $statementMonth): ?CardBillingCycle
+    {
+        return $card->relationLoaded('billingCycles')
+            ? $card->billingCycles
+                ->sortBy('closing_date')
+                ->first(fn (CardBillingCycle $billingCycle): bool => $billingCycle->closing_date->format('Y-m') === $statementMonth->format('Y-m'))
+            : $card->billingCycles()
+                ->whereYear('closing_date', $statementMonth->year)
+                ->whereMonth('closing_date', $statementMonth->month)
+                ->orderBy('closing_date')
+                ->first();
     }
 }

@@ -84,6 +84,110 @@ test('installments start with estimated due dates and are updated to real due da
     expect($transaction->payment_date->toDateString())->toBe('2026-04-17');
 });
 
+test('a manual closing date corrects existing card expenses and their statement assignment', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+
+    foreach (['2026-10-19', '2026-10-22', '2026-10-25'] as $purchaseDate) {
+        $this->actingAs($user)
+            ->postJson('/transactions', [
+                'type' => 'expense',
+                'description' => "Compra {$purchaseDate}",
+                'amount' => 1000,
+                'purchase_date' => $purchaseDate,
+                'payment_method' => 'credit',
+                'card_id' => $card->id,
+                'installments_count' => 1,
+                'tag_ids' => [],
+            ])
+            ->assertCreated();
+    }
+
+    $transactions = Transaction::query()->where('card_id', $card->id)->orderBy('purchase_date')->get();
+
+    expect($transactions->map(fn (Transaction $transaction): string => $transaction->payment_date->toDateString())->all())
+        ->toBe(['2026-11-03', '2026-12-03', '2026-12-03']);
+
+    $cycle = $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-05',
+        ])
+        ->assertCreated();
+
+    expect($transactions->map(fn (Transaction $transaction): string => $transaction->fresh()->payment_date->toDateString())->all())
+        ->toBe(['2026-11-05', '2026-11-05', '2026-12-03']);
+
+    $this->actingAs($user)
+        ->getJson('/transactions?period=2026-11')
+        ->assertSuccessful()
+        ->assertJsonCount(2);
+
+    $this->actingAs($user)
+        ->patchJson("/cards/{$card->id}/billing-cycles/{$cycle->json('id')}", [
+            'due_date' => '2026-11-06',
+        ])
+        ->assertSuccessful();
+
+    expect($transactions->map(fn (Transaction $transaction): string => $transaction->fresh()->payment_date->toDateString())->all())
+        ->toBe(['2026-11-06', '2026-11-06', '2026-12-03']);
+
+    $this->actingAs($user)
+        ->deleteJson("/cards/{$card->id}/billing-cycles/{$cycle->json('id')}")
+        ->assertNoContent();
+
+    expect($transactions->map(fn (Transaction $transaction): string => $transaction->fresh()->payment_date->toDateString())->all())
+        ->toBe(['2026-11-03', '2026-12-03', '2026-12-03']);
+});
+
+test('a manual closing date moves a pending installment purchase into its actual statement', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/transactions', [
+            'type' => 'expense',
+            'description' => 'Compra del 22 de octubre',
+            'amount' => 2000,
+            'purchase_date' => '2026-10-22',
+            'payment_method' => 'credit',
+            'card_id' => $card->id,
+            'installments_count' => 2,
+            'tag_ids' => [],
+        ])
+        ->assertCreated();
+
+    $plan = InstallmentPlan::query()->where('card_id', $card->id)->firstOrFail();
+
+    expect($plan->first_due_date->toDateString())->toBe('2026-12-03');
+
+    $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-05',
+        ])
+        ->assertCreated();
+
+    expect($plan->fresh()->first_due_date->toDateString())->toBe('2026-11-05')
+        ->and($plan->installments()->orderBy('installment_number')->pluck('due_date')->map->toDateString()->all())
+        ->toBe(['2026-11-05', '2026-12-03'])
+        ->and($plan->transaction->fresh()->payment_date->toDateString())->toBe('2026-11-05');
+});
+
 test('a card with the same closing and due day behaves as a credit line', function () {
     $user = User::factory()->create();
     $card = Card::query()->create([

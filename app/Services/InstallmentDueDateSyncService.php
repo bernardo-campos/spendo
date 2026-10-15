@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentMethodType;
 use App\Models\Card;
 use App\Models\InstallmentPlan;
-use Carbon\CarbonImmutable;
 
 class InstallmentDueDateSyncService
 {
+    public function __construct(private CardPaymentDateService $cardPaymentDateService) {}
+
     public function syncCard(Card $card): void
     {
+        $card->load('billingCycles');
+
         $plans = $card->installmentPlans()
             ->where('status', 'pending')
             ->with(['transaction', 'installments'])
@@ -18,6 +22,24 @@ class InstallmentDueDateSyncService
         foreach ($plans as $plan) {
             $this->syncPlan($plan);
         }
+
+        $card->transactions()
+            ->where('type', 'expense')
+            ->where('payment_method', PaymentMethodType::Credit->value)
+            ->whereDoesntHave('installmentPlan')
+            ->chunkById(100, function ($transactions) use ($card): void {
+                foreach ($transactions as $transaction) {
+                    $paymentDate = $this->cardPaymentDateService->resolve(
+                        $transaction->purchase_date->toDateString(),
+                        PaymentMethodType::Credit->value,
+                        $card,
+                    )['date'];
+
+                    if ($transaction->payment_date?->toDateString() !== $paymentDate) {
+                        $transaction->update(['payment_date' => $paymentDate]);
+                    }
+                }
+            });
     }
 
     public function syncPlan(InstallmentPlan $plan): void
@@ -28,19 +50,18 @@ class InstallmentDueDateSyncService
             return;
         }
 
-        $card = $plan->card()->first();
+        $card = $plan->card()->with('billingCycles')->first();
 
         if ($card === null) {
             return;
         }
 
         $closingDay = $card->closing_day ?? 1;
-        $purchaseDate = CarbonImmutable::instance($transaction->purchase_date);
-        $statementMonth = $purchaseDate->day <= $closingDay
-            ? $purchaseDate->startOfMonth()
-            : $purchaseDate->addMonthNoOverflow()->startOfMonth();
-        $cyclesByMonth = $card->billingCycles()
-            ->get()
+        $statementMonth = $this->cardPaymentDateService->statementMonthForPurchase(
+            $transaction->purchase_date->toImmutable(),
+            $card,
+        );
+        $cyclesByMonth = $card->billingCycles
             ->keyBy(fn ($cycle): string => $cycle->closing_date->format('Y-m'));
 
         $installments = $plan->installments()

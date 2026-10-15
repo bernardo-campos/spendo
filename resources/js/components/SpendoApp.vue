@@ -707,11 +707,10 @@ watch(
 );
 
 watch(() => offlineSyncState.value.status, async (status) => {
-    if (status === 'synced' && offlineSyncState.value.pending === 0 && offlineSyncState.value.failed === 0
-        && ['dashboard', 'income-list', 'expense-list'].includes(activeScreen.value)) {
+    if (status === 'synced' && offlineSyncState.value.pending === 0 && offlineSyncState.value.failed === 0) {
         invalidateTransactions();
         await runWithLoading(() => loadTransactions({ force: true }), 'No fue posible actualizar las transacciones.');
-        if (['dashboard', 'expense-list'].includes(activeScreen.value)) {
+        if (['dashboard', 'expense-list', 'cards'].includes(activeScreen.value)) {
             await runWithLoading(loadRecurringPreview, 'No fue posible actualizar los gastos recurrentes.');
         }
     }

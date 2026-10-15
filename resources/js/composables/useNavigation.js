@@ -11,6 +11,7 @@ export const useNavigation = ({ form }) => {
         tags: '/app/tags',
         cards: '/app/cards',
         visualization: '/app/visualization',
+        'receipt-import': '/app/receipt-import',
     };
 
     const getLocationState = () => {

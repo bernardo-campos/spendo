@@ -3,6 +3,7 @@ import {
     BarChart3,
     CreditCard,
     FolderTree,
+    MailPlus,
     ReceiptText,
     Repeat2,
     SlidersHorizontal,
@@ -97,6 +98,10 @@ const visibleCurrencyTotals = (totals) => Object.entries(totals)
             <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'visualization' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'visualization')">
                 <SlidersHorizontal class="size-4" />
                 Visualización
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors" :class="activeScreen === 'receipt-import' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'hover:bg-sidebar-accent'" @click="emit('navigate', 'receipt-import')">
+                <MailPlus class="size-4" />
+                Importar recibos
             </button>
         </nav>
 

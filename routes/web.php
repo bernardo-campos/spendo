@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReceiptImportAddressController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -42,4 +43,7 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::apiResource('installment-plans', InstallmentPlanController::class);
     Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);
     Route::put('visualization-preferences', [VisualizationPreferenceController::class, 'update']);
+    Route::get('receipt-import-address', [ReceiptImportAddressController::class, 'show']);
+    Route::post('receipt-import-address', [ReceiptImportAddressController::class, 'store'])->middleware('throttle:6,1');
+    Route::post('receipt-import-address/rotate', [ReceiptImportAddressController::class, 'rotate'])->middleware('throttle:6,1');
 });

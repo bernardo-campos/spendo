@@ -20,6 +20,7 @@ import TagsPage from '../pages/TagsPage.vue';
 import TransactionFormPage from '../pages/TransactionFormPage.vue';
 import TransactionListPage from '../pages/TransactionListPage.vue';
 import RecurringExpensesPage from '../pages/RecurringExpensesPage.vue';
+import ReceiptImportPage from '../pages/ReceiptImportPage.vue';
 import VisualizationPage from '../pages/VisualizationPage.vue';
 
 const rootElement = document.getElementById('spendo-app');
@@ -51,6 +52,9 @@ const savingTransaction = ref(false);
 const deletingTransaction = ref(false);
 const loadingVisualizationPreferences = ref(true);
 const savingVisualizationPreferences = ref(false);
+const receiptAddress = ref(null);
+const loadingReceiptAddress = ref(false);
+const savingReceiptAddress = ref(false);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
 const places = ref([]);
@@ -126,6 +130,56 @@ const saveVisualizationPreferences = async () => {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible guardar las preferencias de visualización.';
     } finally {
         savingVisualizationPreferences.value = false;
+    }
+};
+
+const loadReceiptAddress = async () => {
+    loadingReceiptAddress.value = true;
+    receiptAddress.value = null;
+
+    try {
+        const response = await window.axios.get('/receipt-import-address');
+        receiptAddress.value = response.data.address;
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible cargar la dirección de importación.';
+    } finally {
+        loadingReceiptAddress.value = false;
+    }
+};
+
+const generateReceiptAddress = async () => {
+    savingReceiptAddress.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const response = await window.axios.post('/receipt-import-address');
+        receiptAddress.value = response.data.address;
+        successMessage.value = 'Dirección de importación creada.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible crear la dirección de importación.';
+    } finally {
+        savingReceiptAddress.value = false;
+    }
+};
+
+const rotateReceiptAddress = async () => {
+    if (!window.confirm('¿Regenerar la dirección? La dirección anterior dejará de recibir tus recibos.')) {
+        return;
+    }
+
+    savingReceiptAddress.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+        const response = await window.axios.post('/receipt-import-address/rotate');
+        receiptAddress.value = response.data.address;
+        successMessage.value = 'Dirección regenerada. Usá la nueva dirección para los próximos reenvíos.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible regenerar la dirección.';
+    } finally {
+        savingReceiptAddress.value = false;
     }
 };
 
@@ -229,6 +283,12 @@ const {
     returnToTransactionList,
     setActiveScreenFromMenu: navigateToScreen,
 } = useNavigation({ form });
+
+watch(activeScreen, (screen) => {
+    if (screen === 'receipt-import') {
+        void loadReceiptAddress();
+    }
+}, { immediate: true });
 
 const {
     categoryOptions,
@@ -799,6 +859,7 @@ const deleteTransaction = async () => {
         <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
 
         <VisualizationPage v-if="activeScreen === 'visualization'" :loading="loadingVisualizationPreferences" :preferences="expenseListDisplayPreferences" :saving="savingVisualizationPreferences" @submit="saveVisualizationPreferences" />
+        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

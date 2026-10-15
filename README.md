@@ -18,6 +18,7 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
   - relación con categorías y tags,
   - notas opcionales.
 - [Gastos recurrentes](docs/gastos-recurrentes.md) con importes fijos automáticos y variables aproximados hasta su confirmación.
+- [Importación de recibos por correo](docs/importacion-recibos.md): recepción de correos de Uber y creación automática de egresos en Efectivo cuando se reconocen sus datos, con guía de prueba manual local.
 - Gestión de tarjetas:
   - nombre,
   - últimos 4 dígitos,

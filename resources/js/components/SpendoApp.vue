@@ -57,6 +57,9 @@ const loadingReceiptAddress = ref(false);
 const savingReceiptAddress = ref(false);
 const receiptProviders = ref([]);
 const savingReceiptProvider = ref(null);
+const receiptVerifications = ref([]);
+const loadingReceiptVerifications = ref(false);
+const dismissingReceiptVerification = ref(null);
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
 const places = ref([]);
@@ -135,6 +138,34 @@ const saveVisualizationPreferences = async () => {
     }
 };
 
+const loadReceiptVerifications = async () => {
+    loadingReceiptVerifications.value = true;
+
+    try {
+        const response = await window.axios.get('/receipt-import-verifications');
+        receiptVerifications.value = response.data.verifications;
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible consultar las verificaciones de Gmail.';
+    } finally {
+        loadingReceiptVerifications.value = false;
+    }
+};
+
+const dismissReceiptVerification = async (verificationId) => {
+    dismissingReceiptVerification.value = verificationId;
+    errorMessage.value = '';
+
+    try {
+        await window.axios.patch(`/receipt-import-verifications/${verificationId}/dismiss`);
+        receiptVerifications.value = receiptVerifications.value.filter((verification) => verification.id !== verificationId);
+        successMessage.value = 'Aviso de verificación ocultado.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible ocultar el aviso de verificación.';
+    } finally {
+        dismissingReceiptVerification.value = null;
+    }
+};
+
 const loadReceiptAddress = async () => {
     loadingReceiptAddress.value = true;
     receiptAddress.value = null;
@@ -145,6 +176,7 @@ const loadReceiptAddress = async () => {
             window.axios.get('/receipt-import-settings'),
             loadCategories(),
             loadPlaces(),
+            loadReceiptVerifications(),
         ]);
         receiptAddress.value = addressResponse.data.address;
         receiptProviders.value = settingsResponse.data.providers;
@@ -179,6 +211,7 @@ const generateReceiptAddress = async () => {
     try {
         const response = await window.axios.post('/receipt-import-address');
         receiptAddress.value = response.data.address;
+        receiptVerifications.value = [];
         successMessage.value = 'Dirección de importación creada.';
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible crear la dirección de importación.';
@@ -199,6 +232,7 @@ const rotateReceiptAddress = async () => {
     try {
         const response = await window.axios.post('/receipt-import-address/rotate');
         receiptAddress.value = response.data.address;
+        receiptVerifications.value = [];
         successMessage.value = 'Dirección regenerada. Usá la nueva dirección para los próximos reenvíos.';
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? 'No fue posible regenerar la dirección.';
@@ -883,7 +917,7 @@ const deleteTransaction = async () => {
         <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
 
         <VisualizationPage v-if="activeScreen === 'visualization'" :loading="loadingVisualizationPreferences" :preferences="expenseListDisplayPreferences" :saving="savingVisualizationPreferences" @submit="saveVisualizationPreferences" />
-        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :providers="receiptProviders" :categories="categories" :places="places" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" :saving-provider="savingReceiptProvider" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" @save-settings="saveReceiptProviderSettings" />
+        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :providers="receiptProviders" :categories="categories" :places="places" :verifications="receiptVerifications" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" :saving-provider="savingReceiptProvider" :loading-verifications="loadingReceiptVerifications" :dismissing-verification="dismissingReceiptVerification" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" @save-settings="saveReceiptProviderSettings" @refresh-verifications="loadReceiptVerifications" @dismiss-verification="dismissReceiptVerification" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

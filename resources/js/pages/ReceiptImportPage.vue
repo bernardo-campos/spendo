@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { ClipboardCopy, MailPlus, MapPin, RefreshCw } from '@lucide/vue';
+import { ClipboardCopy, ExternalLink, MailPlus, MapPin, RefreshCw } from '@lucide/vue';
 
 const props = defineProps({
     address: { type: String, default: null },
@@ -9,10 +9,13 @@ const props = defineProps({
     providers: { type: Array, required: true },
     categories: { type: Array, required: true },
     places: { type: Array, required: true },
+    verifications: { type: Array, required: true },
+    loadingVerifications: { type: Boolean, required: true },
+    dismissingVerification: { type: Number, default: null },
     savingProvider: { type: String, default: null },
 });
 
-const emit = defineEmits(['generate', 'rotate', 'save-settings']);
+const emit = defineEmits(['generate', 'rotate', 'save-settings', 'refresh-verifications', 'dismiss-verification']);
 const addressInput = ref(null);
 const copyFeedback = ref('');
 const selectedCategories = reactive({});
@@ -116,6 +119,28 @@ const copyAddress = async () => {
                     {{ saving ? 'Generando...' : 'Generar dirección' }}
                 </button>
             </div>
+        </article>
+
+        <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <h3 class="text-base font-semibold">Verificar reenvío de Gmail</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Si configurás un filtro de reenvío en Gmail, primero añadí tu dirección de Spendo como destino. Gmail enviará aquí un correo para confirmar la solicitud.</p>
+            <button type="button" class="mt-4 inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800" :disabled="!address || loadingVerifications" @click="emit('refresh-verifications')">
+                <RefreshCw class="size-4" />
+                {{ loadingVerifications ? 'Buscando...' : 'Buscar correo de verificación' }}
+            </button>
+            <p v-if="!loadingVerifications && address && verifications.length === 0" class="mt-3 text-sm text-slate-500 dark:text-slate-400">No hay avisos de verificación pendientes para esta dirección.</p>
+            <ul v-if="verifications.length" class="mt-4 grid gap-3">
+                <li v-for="verification in verifications" :key="verification.id" class="rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+                    <p>Solicitud de reenvío de <strong>{{ verification.source }}</strong></p>
+                    <a :href="verification.url" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex items-center gap-1 font-medium text-blue-700 underline underline-offset-2 dark:text-blue-300">
+                        Abrir enlace de confirmación <ExternalLink class="size-4" />
+                    </a>
+                    <button type="button" class="mt-3 block text-sm font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:text-white" :disabled="dismissingVerification !== null" @click="emit('dismiss-verification', verification.id)">
+                        {{ dismissingVerification === verification.id ? 'Ocultando...' : 'Ya terminé la verificación · ocultar aviso' }}
+                    </button>
+                </li>
+            </ul>
+            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">Después de abrir el enlace, volvé a Gmail, actualizá su configuración y creá el filtro. Ocultar el aviso no confirma el reenvío en Gmail.</p>
         </article>
 
         <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">

@@ -15,6 +15,7 @@ class ReceiptImportService
     public function __construct(
         private UberReceiptParser $uberReceiptParser,
         private ReceiptExpenseService $receiptExpenseService,
+        private GmailForwardingVerificationParser $gmailForwardingVerificationParser,
     ) {}
 
     public function addressFor(User $user, bool $rotate = false): string
@@ -74,13 +75,14 @@ class ReceiptImportService
 
         $contentHash = hash('sha256', $message);
         $path = "inbound-receipts/{$user->id}/{$contentHash}.eml";
-        $parsed = $this->uberReceiptParser->parse($message);
+        $verification = $this->gmailForwardingVerificationParser->parse($message, $recipient);
+        $parsed = $verification === null ? $this->uberReceiptParser->parse($message) : null;
 
         if (! Storage::disk('local')->put($path, $message)) {
             throw new RuntimeException('No se pudo guardar el mensaje entrante.');
         }
 
-        $storedPath = DB::transaction(function () use ($user, $recipient, $contentHash, $path, $parsed): string {
+        $storedPath = DB::transaction(function () use ($user, $recipient, $contentHash, $path, $parsed, $verification): string {
             DB::table('inbound_receipts')->insertOrIgnore([
                 'user_id' => $user->id,
                 'recipient' => $recipient,
@@ -92,6 +94,8 @@ class ReceiptImportService
                 'amount' => $parsed['amount'] ?? null,
                 'origin_address' => $parsed['origin_address'] ?? null,
                 'destination_address' => $parsed['destination_address'] ?? null,
+                'gmail_forwarding_source' => $verification['source'] ?? null,
+                'gmail_verification_url' => $verification['url'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -123,6 +127,14 @@ class ReceiptImportService
                     'amount' => $parsed['amount'],
                     'origin_address' => $parsed['origin_address'],
                     'destination_address' => $parsed['destination_address'],
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if ($verification !== null && $receipt->status === 'pending') {
+                DB::table('inbound_receipts')->where('id', $receipt->id)->update([
+                    'gmail_forwarding_source' => $verification['source'],
+                    'gmail_verification_url' => $verification['url'],
                     'updated_at' => now(),
                 ]);
             }

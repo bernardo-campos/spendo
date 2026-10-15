@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GmailForwardingVerificationController;
 use App\Http\Controllers\ReceiptImportAddressController;
 use App\Http\Controllers\ReceiptImportSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -49,4 +50,6 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::post('receipt-import-address/rotate', [ReceiptImportAddressController::class, 'rotate'])->middleware('throttle:6,1');
     Route::get('receipt-import-settings', [ReceiptImportSettingsController::class, 'index']);
     Route::put('receipt-import-settings/{provider}', [ReceiptImportSettingsController::class, 'update']);
+    Route::get('receipt-import-verifications', [GmailForwardingVerificationController::class, 'index']);
+    Route::patch('receipt-import-verifications/{verification}/dismiss', [GmailForwardingVerificationController::class, 'dismiss']);
 });

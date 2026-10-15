@@ -135,7 +135,7 @@ test('receipt category settings reject unsupported providers and invalid categor
         'scope' => 'expense', 'is_active' => false,
     ]);
 
-    $this->actingAs($user)->putJson('/receipt-import-settings/didi', ['category_id' => null])->assertNotFound();
+    $this->actingAs($user)->putJson('/receipt-import-settings/cabify', ['category_id' => null])->assertNotFound();
 
     foreach ([$otherCategory, $incomeCategory, $inactiveCategory] as $category) {
         $this->actingAs($user)

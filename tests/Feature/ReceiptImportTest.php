@@ -135,6 +135,71 @@ test('a manually forwarded Uber receipt creates one cash expense', function () {
     fclose($secondInput);
 });
 
+test('a forwarded DiDi receipt creates one configured expense and the original is deduplicated', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $category = Category::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Transporte',
+        'slug' => 'transporte',
+        'scope' => 'expense',
+        'is_active' => true,
+    ]);
+    $this->actingAs($user)->putJson('/receipt-import-settings/didi', [
+        'category_id' => $category->id,
+        'place' => 'Viajes por aplicación',
+    ])->assertSuccessful();
+    $this->getJson('/receipt-import-settings')->assertJsonPath('providers.1.key', 'didi');
+
+    $address = app(ReceiptImportService::class)->addressFor($user);
+    $html = '<html><body><p>dom, 10 may, 2026</p><table><tr><td>Total</td><td>$3,320.00</td></tr></table>'
+        .'<div><strong><span>07:20 pm</span></strong></div><div>La Campiña Fiambres Y Lacteos</div>'
+        .'<div><strong><span>07:38 pm</span></strong></div><div>Gaucho Rivero 352</div>'
+        .'<td><a href="https://mpub-proxy.didiglobal.com/hera/click?d=receipt-one"></a>Duda sobre la tarifa</td>'
+        .'</body></html>';
+    $forwarded = "From: Usuario <user@example.com>\r\nDate: Thu, 15 Oct 2026 14:28:18 -0300\r\n"
+        ."Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
+        .quoted_printable_encode($html);
+    $forwardedInput = fopen('php://temp', 'w+');
+    fwrite($forwardedInput, $forwarded);
+    rewind($forwardedInput);
+    app(ReceiptImportService::class)->ingest($address, $forwardedInput);
+
+    $this->assertDatabaseHas('inbound_receipts', [
+        'user_id' => $user->id,
+        'status' => 'imported',
+        'currency' => 'ARS',
+        'amount' => '3320.00',
+        'origin_address' => 'La Campiña Fiambres Y Lacteos',
+        'destination_address' => 'Gaucho Rivero 352',
+    ]);
+    $transaction = Transaction::query()->sole();
+    expect($transaction->description)->toBe('Viaje DiDi: La Campiña Fiambres Y Lacteos → Gaucho Rivero')
+        ->and($transaction->place)->toBe('Viajes por aplicación')
+        ->and($transaction->category_id)->toBe($category->id)
+        ->and($transaction->amount)->toBe('3320.00')
+        ->and($transaction->currency->value)->toBe('ARS')
+        ->and($transaction->payment_method)->toBe('cash')
+        ->and($transaction->purchase_date->toDateString())->toBe('2026-10-15')
+        ->and($transaction->notes)->toContain('La Campiña Fiambres Y Lacteos', 'Gaucho Rivero 352');
+
+    $original = "From: DiDi <didi@ar.didiglobal.com>\r\nDate: Sun, 10 May 2026 22:39:09 +0000\r\n"
+        ."Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+        .base64_encode($html);
+    $originalInput = fopen('php://temp', 'w+');
+    fwrite($originalInput, $original);
+    rewind($originalInput);
+    app(ReceiptImportService::class)->ingest($address, $originalInput);
+
+    expect(Transaction::query()->count())->toBe(1)
+        ->and(DB::table('inbound_receipts')->count())->toBe(1)
+        ->and(Storage::disk('local')->allFiles())->toHaveCount(1);
+
+    fclose($forwardedInput);
+    fclose($originalInput);
+});
+
 test('a previously pending receipt is imported when delivered again after parser support is added', function () {
     Storage::fake('local');
 

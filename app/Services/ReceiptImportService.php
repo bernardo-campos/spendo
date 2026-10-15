@@ -14,6 +14,7 @@ class ReceiptImportService
 
     public function __construct(
         private UberReceiptParser $uberReceiptParser,
+        private DidiReceiptParser $didiReceiptParser,
         private ReceiptExpenseService $receiptExpenseService,
         private GmailForwardingVerificationParser $gmailForwardingVerificationParser,
     ) {}
@@ -76,7 +77,16 @@ class ReceiptImportService
         $contentHash = hash('sha256', $message);
         $path = "inbound-receipts/{$user->id}/{$contentHash}.eml";
         $verification = $this->gmailForwardingVerificationParser->parse($message, $recipient);
-        $parsed = $verification === null ? $this->uberReceiptParser->parse($message) : null;
+        $parsed = null;
+
+        if ($verification === null) {
+            $uberReceipt = $this->uberReceiptParser->parse($message);
+            $didiReceipt = $uberReceipt === null ? $this->didiReceiptParser->parse($message) : null;
+
+            $parsed = $uberReceipt !== null
+                ? ['provider' => 'uber', ...$uberReceipt]
+                : ($didiReceipt === null ? null : ['provider' => 'didi', ...$didiReceipt]);
+        }
 
         if (! Storage::disk('local')->put($path, $message)) {
             throw new RuntimeException('No se pudo guardar el mensaje entrante.');

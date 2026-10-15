@@ -11,6 +11,7 @@ class ReceiptImportSettingsController extends Controller
 {
     private const PROVIDERS = [
         'uber' => 'Uber',
+        'didi' => 'DiDi',
     ];
 
     public function index(Request $request): JsonResponse

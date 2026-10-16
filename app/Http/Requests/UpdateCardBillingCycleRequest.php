@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\UniqueCardBillingCycleMonth;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateCardBillingCycleRequest extends FormRequest
 {
@@ -23,28 +24,39 @@ class UpdateCardBillingCycleRequest extends FormRequest
      */
     public function rules(): array
     {
-        $cardId = $this->route('card')?->id;
-        $cycleId = $this->route('billingCycle')?->id;
+        $cardId = (int) $this->route('card')?->id;
+        $cycle = $this->route('billingCycle');
+        $closingDateRules = ['sometimes', 'date_format:Y-m-d'];
+
+        if ($this->input('closing_date') !== $cycle->closing_date->toDateString()) {
+            $closingDateRules[] = new UniqueCardBillingCycleMonth($cardId, (int) $cycle->id);
+        }
 
         return [
-            'closing_date' => [
-                'sometimes',
-                'date',
-                Rule::unique('card_billing_cycles', 'closing_date')
-                    ->where(fn ($query) => $query->where('card_id', $cardId))
-                    ->ignore($cycleId),
-            ],
-            'due_date' => ['sometimes', 'date'],
+            'closing_date' => $closingDateRules,
+            'due_date' => ['sometimes', 'date_format:Y-m-d'],
         ];
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, callable>
      */
-    public function messages(): array
+    public function after(): array
     {
         return [
-            'closing_date.unique' => 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.',
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                $cycle = $this->route('billingCycle');
+                $closingDate = $this->input('closing_date', $cycle->closing_date->toDateString());
+                $dueDate = $this->input('due_date', $cycle->due_date->toDateString());
+
+                if ($dueDate < $closingDate) {
+                    $validator->errors()->add('due_date', 'La fecha de vencimiento debe ser igual o posterior al cierre.');
+                }
+            },
         ];
     }
 }

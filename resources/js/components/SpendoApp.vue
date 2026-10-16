@@ -390,7 +390,6 @@ const {
     submitCategory,
     submitTag,
 } = useCatalogManagement({
-    cards,
     categories,
     errorMessage,
     form,

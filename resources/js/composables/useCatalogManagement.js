@@ -17,7 +17,7 @@ const normalizeSlug = (value) => value
 
 const toInputDateValue = (value) => value ? String(value).slice(0, 10) : '';
 
-export const useCatalogManagement = ({ cards, categories, errorMessage, form, loadCards, loadCategories, loadTags, runWithLoading, successMessage, tags }) => {
+export const useCatalogManagement = ({ categories, errorMessage, form, loadCards, loadCategories, loadTags, runWithLoading, successMessage, tags }) => {
     const categoryForm = ref({ id: null, name: '', scope: 'both' });
     const tagForm = ref({ id: null, name: '' });
     const cardForm = ref({
@@ -69,11 +69,15 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
         cycleForm.id = null;
         cycleForm.closing_date = '';
         cycleForm.due_date = '';
-        billingCycleErrors.value[cardId] = '';
+        billingCycleErrors.value[cardId] = {};
     };
 
-    const clearBillingCycleError = (cardId) => {
-        billingCycleErrors.value[cardId] = '';
+    const clearBillingCycleError = (cardId, field) => {
+        if (field) {
+            billingCycleErrors.value[cardId] = { ...billingCycleErrors.value[cardId], [field]: [] };
+        } else {
+            billingCycleErrors.value[cardId] = {};
+        }
     };
 
     const editCategory = (category) => {
@@ -255,31 +259,24 @@ export const useCatalogManagement = ({ cards, categories, errorMessage, form, lo
 
         try {
             const cycleForm = getBillingCycleForm(cardId);
-            const existingCycles = cards.value.find((card) => String(card.id) === String(cardId))?.billing_cycles ?? [];
-
-            if (existingCycles.some((cycle) => String(cycle.closing_date).slice(0, 10) === cycleForm.closing_date
-                && String(cycle.id) !== String(cycleForm.id))) {
-                billingCycleErrors.value[cardId] = 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.';
-                return;
-            }
-
             const payload = { closing_date: cycleForm.closing_date, due_date: cycleForm.due_date };
+            const isNewCycle = cycleForm.id === null;
+            const response = await offlineClient.mutate(
+                isNewCycle ? 'post' : 'put',
+                isNewCycle ? `/cards/${cardId}/billing-cycles` : `/cards/${cardId}/billing-cycles/${cycleForm.id}`,
+                payload,
+            );
 
-            if (cycleForm.id === null) {
-                await offlineClient.mutate('post', `/cards/${cardId}/billing-cycles`, payload);
-                successMessage.value = 'Ciclo de facturación creado correctamente.';
-            } else {
-                await offlineClient.mutate('put', `/cards/${cardId}/billing-cycles/${cycleForm.id}`, payload);
-                successMessage.value = 'Ciclo de facturación actualizado correctamente.';
-            }
+            successMessage.value = response.isPending
+                ? 'Ciclo de facturación pendiente de sincronización.'
+                : isNewCycle ? 'Ciclo de facturación creado correctamente.' : 'Ciclo de facturación actualizado correctamente.';
 
             resetBillingCycleForm(cardId);
-            await runWithLoading(loadCards, 'No fue posible cargar las tarjetas.');
+            await runWithLoading(() => loadCards({ fresh: !response.isPending }), 'No fue posible cargar las tarjetas.');
         } catch (error) {
-            billingCycleErrors.value[cardId] = error?.response?.data?.errors?.closing_date?.[0]
-                ?? error?.response?.data?.errors?.due_date?.[0]
-                ?? error?.response?.data?.message
-                ?? 'No fue posible guardar el ciclo de facturación.';
+            billingCycleErrors.value[cardId] = error?.response?.status === 422 && error.response.data?.errors
+                ? error.response.data.errors
+                : { general: [error?.response?.data?.message ?? 'No fue posible guardar el ciclo de facturación.'] };
         } finally {
             savingBillingCycle.value = false;
         }

@@ -1,8 +1,10 @@
 <?php
 
 return [
+    'after_or_equal' => 'El campo :attribute debe ser igual o posterior a :date.',
     'confirmed' => 'La confirmación de :attribute no coincide.',
     'current_password' => 'La contraseña no es correcta.',
+    'date_format' => 'El campo :attribute debe tener el formato :format.',
     'email' => 'El campo :attribute debe ser un email válido.',
     'max' => [
         'string' => 'El campo :attribute no puede tener más de :max caracteres.',
@@ -21,6 +23,8 @@ return [
         'uncompromised' => 'La contraseña apareció en una filtración de datos. Elegí otra contraseña.',
     ],
     'attributes' => [
+        'closing_date' => 'fecha de cierre',
+        'due_date' => 'fecha de vencimiento',
         'email' => 'email',
         'name' => 'nombre',
         'password' => 'contraseña',

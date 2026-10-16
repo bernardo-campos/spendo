@@ -13,6 +13,10 @@ export const useCatalogs = () => {
     const sortCategories = (categoryList) => [...categoryList].sort((left, right) => categorySortKey(left)
         .localeCompare(categorySortKey(right), 'es-AR', { sensitivity: 'base' }));
 
+    const sortCards = (cardList) => [...cardList].sort((left, right) => String(left.name ?? '')
+        .localeCompare(String(right.name ?? ''), 'es-AR', { sensitivity: 'base' })
+        || String(left.id).localeCompare(String(right.id), 'es-AR', { numeric: true }));
+
     const loadCategories = async () => {
         const response = await offlineClient.get('/categories');
         categories.value = sortCategories(response.data);
@@ -25,7 +29,7 @@ export const useCatalogs = () => {
 
     const loadCards = async ({ fresh = false } = {}) => {
         const response = await offlineClient.get('/cards', { fresh });
-        cards.value = response.data;
+        cards.value = sortCards(response.data);
     };
 
     const ensureTransactionFormData = async () => {

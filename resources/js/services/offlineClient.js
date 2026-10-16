@@ -783,6 +783,41 @@ const mutate = async (method, url, payload = undefined) => {
     const idempotencyKey = uuid();
     const storedPayload = cloneForStorage(payload);
 
+    if (routeInfo(url).type === 'billing-cycles' && navigator.onLine && !/local-[^/]+/.test(url)) {
+        clearValidationError();
+        let response;
+
+        try {
+            response = await window.axios.request({
+                url,
+                method,
+                data: storedPayload,
+                headers: { 'Idempotency-Key': idempotencyKey },
+            });
+        } catch (error) {
+            if (error.response) {
+                throw error;
+            }
+        }
+
+        if (response) {
+            const route = routeInfo(url);
+
+            try {
+                if (method === 'delete') {
+                    await removeRecord('billing-cycles', route.id);
+                    await updateCachedCardCycles(route.parentId, { id: route.id }, true);
+                } else {
+                    await reconcile({ method, url, localId: route.id ?? response.data.id }, response.data);
+                }
+            } catch (error) {
+                console.error('No fue posible actualizar la copia local del ciclo de facturación.', error);
+            }
+
+            return response;
+        }
+    }
+
     try {
         const optimistic = await applyOptimisticMutation(method, url, storedPayload ?? {});
         const mutation = {

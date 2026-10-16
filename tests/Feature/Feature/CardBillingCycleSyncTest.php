@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('a duplicate billing cycle returns a clear validation message', function () {
+test('a billing cycle cannot overlap another real cycle in the same closing month', function () {
     $user = User::factory()->create();
     $card = Card::query()->create([
         'user_id' => $user->id,
@@ -27,7 +27,7 @@ test('a duplicate billing cycle returns a clear validation message', function ()
         'closing_date' => '2026-11-20',
         'due_date' => '2026-12-03',
     ]);
-    $message = 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.';
+    $message = 'Ya existe un ciclo de facturación para ese mes de cierre en esta tarjeta.';
 
     $this->actingAs($user)
         ->postJson("/cards/{$card->id}/billing-cycles", [
@@ -38,14 +38,108 @@ test('a duplicate billing cycle returns a clear validation message', function ()
         ->assertJsonPath('errors.closing_date.0', $message);
 
     $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [
+            'closing_date' => '2026-10-25',
+            'due_date' => '2026-11-06',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.closing_date.0', $message);
+
+    $this->actingAs($user)
         ->putJson("/cards/{$card->id}/billing-cycles/{$otherCycle->id}", [
-            'closing_date' => '2026-10-24',
-            'due_date' => '2026-11-05',
+            'closing_date' => '2026-10-25',
+            'due_date' => '2026-11-06',
         ])
         ->assertUnprocessable()
         ->assertJsonPath('errors.closing_date.0', $message);
 
     expect($existingCycle->fresh()->closing_date->toDateString())->toBe('2026-10-24');
+});
+
+test('changing only the due date remains possible for a legacy overlapping cycle', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+    $cycle = $card->billingCycles()->create([
+        'closing_date' => '2026-10-24',
+        'due_date' => '2026-11-05',
+    ]);
+    $card->billingCycles()->create([
+        'closing_date' => '2026-10-25',
+        'due_date' => '2026-11-06',
+    ]);
+
+    $this->actingAs($user)
+        ->putJson("/cards/{$card->id}/billing-cycles/{$cycle->id}", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-07',
+        ])
+        ->assertSuccessful();
+
+    expect($cycle->fresh()->due_date->toDateString())->toBe('2026-11-07');
+});
+
+test('a real billing cycle can change either date without overlapping itself', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+    $cycle = $card->billingCycles()->create([
+        'closing_date' => '2026-10-24',
+        'due_date' => '2026-11-05',
+    ]);
+
+    $this->actingAs($user)
+        ->putJson("/cards/{$card->id}/billing-cycles/{$cycle->id}", [
+            'closing_date' => '2026-10-24',
+            'due_date' => '2026-11-06',
+        ])
+        ->assertSuccessful();
+
+    $this->actingAs($user)
+        ->patchJson("/cards/{$card->id}/billing-cycles/{$cycle->id}", [
+            'closing_date' => '2026-10-25',
+        ])
+        ->assertSuccessful();
+
+    expect($cycle->fresh()->closing_date->toDateString())->toBe('2026-10-25')
+        ->and($cycle->fresh()->due_date->toDateString())->toBe('2026-11-06');
+
+    $this->actingAs($user)
+        ->patchJson("/cards/{$card->id}/billing-cycles/{$cycle->id}", [
+            'due_date' => '2026-10-24',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.due_date.0', 'La fecha de vencimiento debe ser igual o posterior al cierre.');
+});
+
+test('missing cycle dates return field errors in Spanish', function () {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id,
+        'name' => 'Visa Test',
+        'last_four_digits' => '1234',
+        'closing_day' => 20,
+        'due_day' => 3,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/cards/{$card->id}/billing-cycles", [])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.closing_date.0', 'El campo fecha de cierre es obligatorio.')
+        ->assertJsonPath('errors.due_date.0', 'El campo fecha de vencimiento es obligatorio.');
 });
 
 test('installments start with estimated due dates and are updated to real due dates when billing cycles are loaded', function () {

@@ -89,3 +89,43 @@ test('rolling back a rejected new cycle removes its cached copy', async () => {
     assert.equal(updated[0][1].id, 'local-123');
     assert.equal(updated[0][2], true);
 });
+
+test('an online billing cycle edit waits for Laravel validation before changing the local copy', async () => {
+    const rejected = { response: { status: 422, data: { errors: { closing_date: ['Mes ocupado.'] } } } };
+    let optimisticWrites = 0;
+    const mutate = loadFunction('mutate', {
+        uuid: () => 'request-key',
+        cloneForStorage: (value) => value,
+        routeInfo,
+        navigator: { onLine: true },
+        clearValidationError: () => {},
+        window: { axios: { request: async () => { throw rejected; } } },
+        applyOptimisticMutation: async () => { optimisticWrites += 1; },
+    });
+
+    await assert.rejects(
+        mutate('put', '/cards/1/billing-cycles/5', { closing_date: '2026-10-25', due_date: '2026-11-06' }),
+        (error) => error === rejected,
+    );
+    assert.equal(optimisticWrites, 0);
+});
+
+test('a confirmed online cycle edit refreshes the local cycle after the server responds', async () => {
+    const calls = [];
+    const response = { data: { id: 5, closing_date: '2026-10-24', due_date: '2026-11-06' } };
+    const mutate = loadFunction('mutate', {
+        uuid: () => 'request-key',
+        cloneForStorage: (value) => value,
+        routeInfo,
+        navigator: { onLine: true },
+        clearValidationError: () => {},
+        window: { axios: { request: async (request) => { calls.push(request); return response; } } },
+        reconcile: async (mutation, data) => { calls.push({ mutation, data }); },
+        console: { error: () => assert.fail('The cache should update successfully') },
+    });
+
+    assert.equal(await mutate('put', '/cards/1/billing-cycles/5', { closing_date: '2026-10-24', due_date: '2026-11-06' }), response);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].method, 'put');
+    assert.equal(calls[1].data.due_date, '2026-11-06');
+});

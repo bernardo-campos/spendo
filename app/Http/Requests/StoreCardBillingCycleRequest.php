@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\UniqueCardBillingCycleMonth;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreCardBillingCycleRequest extends FormRequest
 {
@@ -23,27 +23,15 @@ class StoreCardBillingCycleRequest extends FormRequest
      */
     public function rules(): array
     {
-        $cardId = $this->route('card')?->id;
+        $cardId = (int) $this->route('card')?->id;
 
         return [
             'closing_date' => [
                 'required',
-                'date',
-                Rule::unique('card_billing_cycles', 'closing_date')->where(
-                    fn ($query) => $query->where('card_id', $cardId)
-                ),
+                'date_format:Y-m-d',
+                new UniqueCardBillingCycleMonth($cardId),
             ],
-            'due_date' => ['required', 'date', 'after_or_equal:closing_date'],
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'closing_date.unique' => 'Ya existe un ciclo de facturación con esa fecha de cierre para esta tarjeta.',
+            'due_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:closing_date'],
         ];
     }
 }

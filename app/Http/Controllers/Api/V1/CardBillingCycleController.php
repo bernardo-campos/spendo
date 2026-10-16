@@ -66,24 +66,7 @@ class CardBillingCycleController extends Controller
         abort_unless($card->user_id === $request->user()?->id, 404);
         abort_unless($billingCycle->card_id === $card->id, 404);
 
-        $validated = $request->validated();
-
-        if (isset($validated['due_date']) && ! isset($validated['closing_date'])) {
-            $validated['closing_date'] = $billingCycle->closing_date->toDateString();
-        }
-
-        if (isset($validated['closing_date']) && ! isset($validated['due_date'])) {
-            $validated['due_date'] = $billingCycle->due_date->toDateString();
-        }
-
-        abort_if(
-            isset($validated['due_date'], $validated['closing_date'])
-            && $validated['due_date'] < $validated['closing_date'],
-            422,
-            'La fecha de vencimiento debe ser igual o posterior al cierre.'
-        );
-
-        $billingCycle->update($validated);
+        $billingCycle->update($request->validated());
 
         $this->installmentDueDateSyncService->syncCard($card->fresh());
 

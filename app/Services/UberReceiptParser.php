@@ -17,6 +17,7 @@ class UberReceiptParser
     {
         $parts = preg_split('/\r?\n\r?\n/', $message, 2);
         $date = count($parts) === 2 ? $this->emailParts->headerValue($parts[0], 'Date') : '';
+        $date = preg_replace('/\s+\([^()]*\)$/', '', $date) ?? $date;
         $purchaseDate = $date !== '' ? DateTimeImmutable::createFromFormat(DATE_RFC2822, $date) : false;
 
         foreach ($this->emailParts->htmlParts($message) as $html) {
@@ -78,9 +79,14 @@ class UberReceiptParser
                 $label = $this->normalizeText($node->parentNode->textContent);
             }
 
-            $url = $node->getAttribute('href');
+            if (! preg_match('/^(?:descargar|download) pdf$/iu', $label)) {
+                continue;
+            }
 
-            if (preg_match('/^(?:descargar|download) pdf$/iu', $label) && parse_url($url, PHP_URL_HOST) === 'click.uber.com') {
+            $url = $node->getAttribute('href');
+            $parts = parse_url($url);
+
+            if (is_array($parts) && ($parts['scheme'] ?? null) === 'https' && ! empty($parts['host'])) {
                 return hash('sha256', $url);
             }
         }

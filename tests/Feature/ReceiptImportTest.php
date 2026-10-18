@@ -207,8 +207,8 @@ test('a previously pending receipt is imported when delivered again after parser
     $service = app(ReceiptImportService::class);
     $address = $service->addressFor($user);
     $html = '<td class="m_-7930254747577144633total-fare-amount">ARS&nbsp;2,348.00</td>'
-        .'<a href="https://click.uber.com/f/a/pending-receipt">Descargar PDF</a>';
-    $message = "Date: Thu, 15 Oct 2026 03:42:37 -0300\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
+        .'<a href="https://tracking.ibt.uber.com/tracking/1/click/pending-receipt">Descargar PDF</a>';
+    $message = "Date: Thu, 15 Oct 2026 03:42:37 -0300 (ART)\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
     $hash = hash('sha256', $message);
     $path = "inbound-receipts/{$user->id}/{$hash}.eml";
     Storage::disk('local')->put($path, $message);
@@ -231,7 +231,7 @@ test('a previously pending receipt is imported when delivered again after parser
         'user_id' => $user->id,
         'status' => 'imported',
         'amount' => '2348.00',
-        'source_key' => hash('sha256', 'https://click.uber.com/f/a/pending-receipt'),
+        'source_key' => hash('sha256', 'https://tracking.ibt.uber.com/tracking/1/click/pending-receipt'),
     ]);
     expect(Transaction::query()->count())->toBe(1);
 

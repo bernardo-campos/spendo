@@ -74,6 +74,26 @@ test('it recognizes Gmail class prefixes with a negative message identifier', fu
     ]);
 });
 
+test('it recognizes the PDF link regardless of its HTTPS host', function (string $url) {
+    $html = '<td data-testid="total_fare_amount">ARS&nbsp;2,348.00</td>'
+        .'<td data-testid="address_point_0_address">Ushuaia</td>'
+        .'<td data-testid="address_point_1_address">Gaucho Rivero</td>'
+        .'<a href="'.$url.'">Descargar PDF</a>';
+    $message = "Date: Sat, 17 Oct 2026 23:15:16 +0000 (UTC)\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
+
+    expect(app(UberReceiptParser::class)->parse($message))->toBe([
+        'currency' => 'ARS',
+        'amount' => '2348.00',
+        'origin_address' => 'Ushuaia',
+        'destination_address' => 'Gaucho Rivero',
+        'source_key' => hash('sha256', $url),
+        'purchase_date' => '2026-10-17',
+    ]);
+})->with([
+    'Uber tracking domain' => 'https://tracking.ibt.uber.com/tracking/1/click/example-receipt',
+    'another HTTPS domain' => 'https://receipts.example.test/tracking/1/click/example-receipt',
+]);
+
 test('it leaves unsupported messages unparsed', function () {
     $parser = app(UberReceiptParser::class);
 

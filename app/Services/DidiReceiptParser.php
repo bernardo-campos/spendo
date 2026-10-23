@@ -17,6 +17,7 @@ class DidiReceiptParser
     {
         $parts = preg_split('/\r?\n\r?\n/', $message, 2);
         $date = count($parts) === 2 ? $this->emailParts->headerValue($parts[0], 'Date') : '';
+        $date = preg_replace('/\s+\([^()]*\)$/', '', $date) ?? $date;
         $purchaseDate = $date !== '' ? DateTimeImmutable::createFromFormat(DATE_RFC2822, $date) : false;
 
         foreach ($this->emailParts->htmlParts($message) as $html) {
@@ -54,7 +55,12 @@ class DidiReceiptParser
         $totalNode = $xpath->query('//tr[td[1][normalize-space(.)="Total"]]/td[2]')->item(0);
         $total = $totalNode === null ? '' : $this->normalizeText($totalNode->textContent);
 
-        if (! preg_match('/^\$\s*((?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})$/', $total, $matches)) {
+        if (preg_match('/^\$\s*((?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})$/', $total, $matches)) {
+            $amount = str_replace(',', '', $matches[1]);
+        } elseif (preg_match('/^\$\s*(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:,\d{2})?)$/', $total, $matches)) {
+            $amount = str_replace(',', '.', str_replace('.', '', $matches[1]));
+            $amount = str_contains($amount, '.') ? $amount : $amount.'.00';
+        } else {
             return null;
         }
 
@@ -81,7 +87,6 @@ class DidiReceiptParser
             return null;
         }
 
-        $amount = str_replace(',', '', $matches[1]);
         preg_match('/\b(?:lun|mar|mié|mie|jue|vie|sáb|sab|dom),\s*\d{1,2}\s+\p{L}{3,}\s*,\s*\d{4}/iu', $this->normalizeText($document->textContent), $rideDate);
         $sourceKey = $this->sourceKey($xpath, $amount, $rideDate[0] ?? '', $times, $addresses);
 

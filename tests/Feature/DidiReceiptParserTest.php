@@ -45,6 +45,29 @@ test('it extracts a DiDi trip from base64 and forwarded quoted printable HTML', 
         ->not->toBe($expected['source_key']);
 });
 
+test('it parses an Express receipt with local currency formatting and a timezone comment', function (string $total, string $amount) {
+    $url = 'https://mpub-proxy.didiglobal.com/hera/click?d=express-receipt';
+    $html = '<html><body><p>jue, 22 oct, 2026</p><table><tr><td>Total</td><td>'.$total.'</td></tr></table>'
+        .'<div><strong><span>07:13 am</span></strong></div><div>Calle Uno 100</div>'
+        .'<div><strong><span>07:26 am</span></strong></div><div>Calle Dos 200</div>'
+        .'<td><a href="'.$url.'"></a>Duda sobre la tarifa</td></body></html>';
+    $message = "Date: Thu, 22 Oct 2026 10:26:36 +0000 (UTC)\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$html}";
+
+    expect(app(DidiReceiptParser::class)->parse($message))->toBe([
+        'currency' => 'ARS',
+        'amount' => $amount,
+        'origin_address' => 'Calle Uno 100',
+        'destination_address' => 'Calle Dos 200',
+        'source_key' => hash('sha256', implode("\n", [
+            'didi', $url, 'jue, 22 oct, 2026', '07:13 am', 'Calle Uno 100', '07:26 am', 'Calle Dos 200', $amount,
+        ])),
+        'purchase_date' => '2026-10-22',
+    ]);
+})->with([
+    'whole pesos with a thousands separator' => ['$2.200', '2200.00'],
+    'pesos and cents with local separators' => ['$2.200,50', '2200.50'],
+]);
+
 test('it does not use an unrelated link as a DiDi trip identifier', function () {
     $parser = app(DidiReceiptParser::class);
     $html = didiReceiptHtml('https://mpub-proxy.didiglobal.com.evil.test/hera/click?d=receipt-one');

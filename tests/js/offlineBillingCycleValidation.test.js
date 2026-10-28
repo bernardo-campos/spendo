@@ -53,6 +53,7 @@ test('a current cycle validation error rolls back its optimistic change and rema
         navigator: { onLine: true },
         mutationValues: async () => [mutation],
         syncState,
+        isMissingTransaction: () => false,
         resolveUrl: async (url) => url,
         resolveReferences: async (value) => value,
         window: { axios: { request: async () => {

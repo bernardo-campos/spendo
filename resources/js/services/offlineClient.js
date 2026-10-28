@@ -653,6 +653,21 @@ const reconcile = async (mutation, data) => {
     }
 };
 
+const isMissingTransaction = (mutation, statusCode, message = '') => {
+    const route = routeInfo(mutation.url);
+
+    return route.type === 'transactions' && /^\d+$/.test(route.id ?? '')
+        && ['put', 'patch', 'delete'].includes(mutation.method)
+        && (statusCode === 404 || /No query results for model \[App\\Models\\Transaction\]/.test(message));
+};
+
+const discardMissingTransaction = async (mutation) => {
+    const route = routeInfo(await resolveUrl(mutation.url));
+    await updateCachedTransactionReferences({ id: route.id }, true);
+    await removeRecord('transactions', route.id);
+    await deleteMutation(mutation.id);
+};
+
 const processSync = async () => {
     if (! userId.value || ! navigator.onLine) {
         await updateSyncState('offline');
@@ -669,6 +684,9 @@ const processSync = async () => {
 
     for (const mutation of queued) {
         if (mutation.status === 'failed') {
+            if (isMissingTransaction(mutation, mutation.statusCode, mutation.errorMessage)) {
+                await discardMissingTransaction(mutation);
+            }
             continue;
         }
 
@@ -689,6 +707,11 @@ const processSync = async () => {
         } catch (error) {
             if (! error.response) {
                 break;
+            }
+
+            if (isMissingTransaction(mutation, error.response.status, error.response.data?.message)) {
+                await discardMissingTransaction(mutation);
+                continue;
             }
 
             if (error.response.status === 422 && routeInfo(mutation.url).type === 'billing-cycles') {

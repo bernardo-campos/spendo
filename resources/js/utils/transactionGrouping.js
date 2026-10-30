@@ -15,6 +15,7 @@ const paymentGroup = (transaction) => {
     return {
         key: `payment-card-${cardIdentity}`,
         label: transaction.card?.name ?? 'Crédito sin tarjeta',
+        dueDate: transactionDay(transaction),
     };
 };
 

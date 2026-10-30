@@ -179,10 +179,10 @@ const formatGroupDate = (value) => new Intl.DateTimeFormat('es-AR', {
     year: 'numeric',
 }).format(new Date(`${value}T00:00:00`)).toLocaleLowerCase('es-AR');
 
-const formatTransactionDate = (value) => {
+const formatTransactionDate = (value, yearLength = 4) => {
     const [year, month, day] = String(value).slice(0, 10).split('-');
 
-    return year && month && day ? `${day}/${month}/${year}` : '';
+    return year && month && day ? `${day}/${month}/${year.slice(-yearLength)}` : '';
 };
 
 const tagNames = (transaction) => (transaction.tags ?? [])
@@ -317,9 +317,10 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                     <div v-show="!block.planned || plannedExpanded" class="space-y-5" :class="block.planned ? 'border-b border-dashed border-slate-300 dark:border-slate-600 sm:pb-4' : ''">
                         <section v-for="(group, groupIndex) in block.groups" :key="group.key">
                             <button type="button" class="flex w-full items-baseline justify-between gap-4 px-4 text-left sm:px-0" :class="block.planned ? 'text-secondary-foreground/70' : ''" :aria-expanded="isGroupExpanded(group.key)" @click="toggleGroup(group.key)">
-                                <span class="flex items-center gap-1 text-sm font-semibold">
+                                <span class="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm font-semibold">
                                     <ChevronDown class="size-4 transition-transform duration-200" :class="isGroupExpanded(group.key) ? 'rotate-0' : '-rotate-90'" />
                                     {{ grouping === 'day' ? formatGroupDate(group.key) : group.label }}
+                                    <span v-if="grouping === 'payment_method' && group.dueDate" class="whitespace-nowrap font-normal text-slate-500 dark:text-slate-400">vto: {{ formatTransactionDate(group.dueDate, 2) }}</span>
                                 </span>
                                 <span class="flex shrink-0 flex-col text-right text-sm font-semibold tabular-nums"><span v-for="[currency, amount] in visibleCurrencyTotals(group.totals)" :key="currency">{{ formatCurrencyAmount(currency, amount) }}</span></span>
                             </button>

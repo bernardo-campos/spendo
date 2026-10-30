@@ -33,6 +33,25 @@ test('shows only currencies with amounts in each group total', () => {
     assert.deepEqual(visibleCurrencyTotals({ ARS: 0, USD: 0 }), []);
 });
 
+test('credit card groups use the listed period payment date including installments and recurring expenses', () => {
+    const groups = groupTransactions([
+        { ...transactions[0], purchase_date: '2026-11-10', payment_date: '2026-11-10' },
+        { ...transactions[3], purchase_date: '2026-11-10', installment_number: 3, total_installments: 6 },
+        { ...transactions[2], purchase_date: '2026-11-15', payment_date: '2026-11-15', recurring_expense_id: 1, charge_date: '2026-10-20' },
+        { ...transactions[1], purchase_date: '2026-11-01' },
+    ], 'payment_method');
+
+    assert.deepEqual(groups.map((group) => [group.key, group.dueDate]), [
+        ['payment-cash', undefined],
+        ['payment-card-1', '2026-11-15'],
+        ['payment-card-2', '2026-11-10'],
+    ]);
+
+    for (const grouping of ['day', 'category']) {
+        assert.ok(groupTransactions(transactions, grouping).every((group) => group.dueDate === undefined));
+    }
+});
+
 test('sums both currencies from filtered visible groups and excludes approximate amounts', () => {
     const items = [
         ...transactions,

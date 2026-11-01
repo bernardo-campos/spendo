@@ -1,63 +1,11 @@
 import { formatLocalDate } from './localDate.js';
-
-const formatDateParts = ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-const addMonth = ({ year, month }) => (month === 12
-    ? { year: year + 1, month: 1 }
-    : { year, month: month + 1 });
-
-const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
-
-const buildEstimatedCycle = (card, referenceDate) => {
-    const closingDay = Number(card.closing_day);
-    const dueDay = Number(card.due_day);
-
-    if (!Number.isInteger(closingDay) || !Number.isInteger(dueDay)) {
-        return null;
-    }
-
-    const statementMonth = {
-        year: referenceDate.getFullYear(),
-        month: referenceDate.getMonth() + 1,
-    };
-    const dueMonth = closingDay === dueDay ? statementMonth : addMonth(statementMonth);
-
-    return {
-        id: `estimated-${formatDateParts({
-            ...statementMonth,
-            day: Math.min(closingDay, daysInMonth(statementMonth.year, statementMonth.month)),
-        })}`,
-        closing_date: formatDateParts({
-            ...statementMonth,
-            day: Math.min(closingDay, daysInMonth(statementMonth.year, statementMonth.month)),
-        }),
-        due_date: formatDateParts({
-            ...dueMonth,
-            day: Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month)),
-        }),
-        is_estimated: true,
-    };
-};
+import { buildBillingCycleSchedule } from './cardPaymentDates.js';
 
 export const billingCyclesForCard = (card, monthsAroundToday = 12) => {
-    const estimatedCycles = Array.from({ length: (monthsAroundToday * 2) + 1 }, (_, index) => {
-        const offset = index - monthsAroundToday;
-        const referenceDate = new Date();
-        referenceDate.setMonth(referenceDate.getMonth() + offset, 1);
+    const start = new Date();
+    start.setMonth(start.getMonth() - monthsAroundToday, 1);
 
-        return buildEstimatedCycle(card, referenceDate);
-    }).filter(Boolean);
-    const cyclesByMonth = new Map(estimatedCycles.map((cycle) => [cycle.closing_date.slice(0, 7), cycle]));
-
-    (Array.isArray(card.billing_cycles) ? card.billing_cycles : []).forEach((cycle) => {
-        cyclesByMonth.set(String(cycle.closing_date).slice(0, 7), {
-            ...cycle,
-            is_estimated: false,
-        });
-    });
-
-    return [...cyclesByMonth.values()]
-        .sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)));
+    return buildBillingCycleSchedule(card, formatLocalDate(start), (monthsAroundToday * 2) + 1);
 };
 
 export const billingCyclesAroundToday = (card) => {

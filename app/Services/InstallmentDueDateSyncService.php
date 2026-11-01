@@ -56,36 +56,20 @@ class InstallmentDueDateSyncService
             return;
         }
 
-        $closingDay = $card->closing_day ?? 1;
-        $statementMonth = $this->cardPaymentDateService->statementMonthForPurchase(
-            $transaction->purchase_date->toImmutable(),
-            $card,
-        );
-        $cyclesByMonth = $card->billingCycles
-            ->keyBy(fn ($cycle): string => $cycle->closing_date->format('Y-m'));
-
         $installments = $plan->installments()
             ->orderBy('installment_number')
             ->get()
             ->values();
+        $schedule = $this->cardPaymentDateService->schedule($transaction->purchase_date->toDateString(), $card, $installments->count());
 
         foreach ($installments as $index => $installment) {
             if ($installment->status !== 'pending') {
                 continue;
             }
 
-            $cycleMonth = $statementMonth->addMonthsNoOverflow($index)->format('Y-m');
-            $cycle = $cyclesByMonth->get($cycleMonth);
-            $dueDay = $card->due_day ?? $closingDay;
-            $dueMonth = $closingDay === $dueDay
-                ? $statementMonth->addMonthsNoOverflow($index)
-                : $statementMonth->addMonthsNoOverflow($index + 1);
-            $dueDay = min($dueDay, $dueMonth->endOfMonth()->day);
-
             $installment->update([
-                'due_date' => $cycle?->due_date->toDateString()
-                    ?? $dueMonth->setDay($dueDay)->toDateString(),
-                'due_date_is_estimated' => $cycle === null,
+                'due_date' => $schedule[$index]['due_date'],
+                'due_date_is_estimated' => $schedule[$index]['is_estimated'],
             ]);
         }
 

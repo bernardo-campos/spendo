@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\UniqueCardBillingCycleMonth;
+use App\Rules\UniqueCardBillingCycleDate;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -29,7 +29,7 @@ class UpdateCardBillingCycleRequest extends FormRequest
         $closingDateRules = ['sometimes', 'date_format:Y-m-d'];
 
         if ($this->input('closing_date') !== $cycle->closing_date->toDateString()) {
-            $closingDateRules[] = new UniqueCardBillingCycleMonth($cardId, (int) $cycle->id);
+            $closingDateRules[] = new UniqueCardBillingCycleDate($cardId, (int) $cycle->id);
         }
 
         return [

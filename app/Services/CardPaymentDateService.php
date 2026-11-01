@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\PaymentMethodType;
 use App\Models\Card;
-use App\Models\CardBillingCycle;
 use Carbon\CarbonImmutable;
 
 class CardPaymentDateService
@@ -23,53 +22,62 @@ class CardPaymentDateService
             ];
         }
 
-        $closingDay = $card->closing_day ?? 1;
-        $statementMonth = $this->statementMonthForPurchase($purchase, $card);
-        $cycle = $this->cycleForMonth($card, $statementMonth);
+        $cycle = $this->schedule($purchase->toDateString(), $card, 1)[0];
 
-        if ($cycle !== null) {
-            return [
-                'date' => $cycle->due_date->toDateString(),
-                'is_estimated' => false,
-            ];
+        return ['date' => $cycle['due_date'], 'is_estimated' => $cycle['is_estimated']];
+    }
+
+    /**
+     * @return list<array{closing_date:string,due_date:string,is_estimated:bool}>
+     */
+    public function schedule(string $purchaseDate, Card $card, int $count): array
+    {
+        $card->loadMissing('billingCycles');
+        $realCycles = $card->billingCycles->sortBy('closing_date')->values();
+        $cycles = $realCycles->map(fn ($cycle): array => [
+            'closing_date' => $cycle->closing_date->toDateString(),
+            'due_date' => $cycle->due_date->toDateString(),
+            'is_estimated' => false,
+        ]);
+        $month = CarbonImmutable::parse($purchaseDate)->startOfMonth();
+        $closingDay = $card->closing_day ?? 1;
+        $dueDay = $card->due_day ?? $closingDay;
+        $coveredIntervals = $realCycles->sliding(2)->filter(function ($pair): bool {
+            $previous = $pair->first()->due_date->toImmutable()->startOfMonth();
+            $next = $pair->last()->due_date->toImmutable()->startOfMonth();
+
+            return $previous->diffInMonths($next) >= 0 && $previous->diffInMonths($next) <= 1;
+        });
+        $replacedMonths = $card->billingCycles->map(function ($cycle) use ($closingDay): string {
+            $closing = $cycle->closing_date->toImmutable();
+
+            return collect([-1, 0, 1])->map(function (int $offset) use ($closing, $closingDay): CarbonImmutable {
+                $candidate = $closing->startOfMonth()->addMonthsNoOverflow($offset);
+
+                return $candidate->setDay(min($closingDay, $candidate->daysInMonth));
+            })->sortBy(fn (CarbonImmutable $candidate): float => abs($candidate->diffInDays($closing)))
+                ->first()->format('Y-m');
+        })->all();
+
+        for ($offset = 0; $cycles->where('closing_date', '>=', $purchaseDate)->count() < $count || $offset <= $count + 1; $offset++) {
+            $closingMonth = $month->addMonthsNoOverflow($offset);
+            $dueMonth = $closingDay === $dueDay ? $closingMonth : $closingMonth->addMonthNoOverflow();
+            $closingDate = $closingMonth->setDay(min($closingDay, $closingMonth->daysInMonth))->toDateString();
+
+            if (in_array($closingMonth->format('Y-m'), $replacedMonths, true)
+                || $coveredIntervals->contains(fn ($pair): bool => $closingDate > $pair->first()->closing_date->toDateString()
+                    && $closingDate < $pair->last()->closing_date->toDateString())) {
+                continue;
+            }
+
+            $cycles->push([
+                'closing_date' => $closingDate,
+                'due_date' => $dueMonth->setDay(min($dueDay, $dueMonth->daysInMonth))->toDateString(),
+                'is_estimated' => true,
+            ]);
         }
 
-        $dueDay = $card->due_day ?? $closingDay;
-
-        $dueMonth = $closingDay === $dueDay
-            ? $statementMonth
-            : $statementMonth->addMonthNoOverflow();
-        $lastDayOfDueMonth = $dueMonth->endOfMonth()->day;
-        $safeDueDay = min($dueDay, $lastDayOfDueMonth);
-
-        return [
-            'date' => $dueMonth->setDay($safeDueDay)->toDateString(),
-            'is_estimated' => true,
-        ];
-    }
-
-    public function statementMonthForPurchase(CarbonImmutable $purchase, Card $card): CarbonImmutable
-    {
-        $purchaseMonth = $purchase->startOfMonth();
-        $closingDay = $this->cycleForMonth($card, $purchaseMonth)?->closing_date->day
-            ?? $card->closing_day
-            ?? 1;
-
-        return $purchase->day <= $closingDay
-            ? $purchaseMonth
-            : $purchaseMonth->addMonthNoOverflow();
-    }
-
-    private function cycleForMonth(Card $card, CarbonImmutable $statementMonth): ?CardBillingCycle
-    {
-        return $card->relationLoaded('billingCycles')
-            ? $card->billingCycles
-                ->sortBy('closing_date')
-                ->first(fn (CardBillingCycle $billingCycle): bool => $billingCycle->closing_date->format('Y-m') === $statementMonth->format('Y-m'))
-            : $card->billingCycles()
-                ->whereYear('closing_date', $statementMonth->year)
-                ->whereMonth('closing_date', $statementMonth->month)
-                ->orderBy('closing_date')
-                ->first();
+        return $cycles->where('closing_date', '>=', $purchaseDate)
+            ->sortBy('closing_date')->take($count)->values()->all();
     }
 }

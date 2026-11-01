@@ -8,7 +8,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Translation\PotentiallyTranslatedString;
 
-class UniqueCardBillingCycleMonth implements ValidationRule
+class UniqueCardBillingCycleDate implements ValidationRule
 {
     public function __construct(private int $cardId, private ?int $exceptCycleId = null) {}
 
@@ -31,17 +31,14 @@ class UniqueCardBillingCycleMonth implements ValidationRule
 
         $query = DB::table('card_billing_cycles')
             ->where('card_id', $this->cardId)
-            ->whereBetween('closing_date', [
-                $closingDate->format('Y-m-01'),
-                $closingDate->format('Y-m-t'),
-            ]);
+            ->where('closing_date', $closingDate->format('Y-m-d'));
 
         if ($this->exceptCycleId !== null) {
             $query->where('id', '!=', $this->exceptCycleId);
         }
 
         if ($query->exists()) {
-            $fail('Ya existe un ciclo de facturación para ese mes de cierre en esta tarjeta.');
+            $fail('Ya existe un ciclo de facturación con esa fecha de cierre en esta tarjeta.');
         }
     }
 }

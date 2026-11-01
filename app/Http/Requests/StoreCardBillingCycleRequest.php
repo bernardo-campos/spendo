@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\UniqueCardBillingCycleMonth;
+use App\Rules\UniqueCardBillingCycleDate;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -29,7 +29,7 @@ class StoreCardBillingCycleRequest extends FormRequest
             'closing_date' => [
                 'required',
                 'date_format:Y-m-d',
-                new UniqueCardBillingCycleMonth($cardId),
+                new UniqueCardBillingCycleDate($cardId),
             ],
             'due_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:closing_date'],
         ];

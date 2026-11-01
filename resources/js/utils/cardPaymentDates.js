@@ -1,150 +1,133 @@
 const toDateParts = (value) => {
-    const [year, month, day] = String(value).split('-').map((part) => Number.parseInt(part, 10));
+    const [year, month, day] = String(value).split('-').map(Number);
 
-    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-        return null;
-    }
-
-    return { year, month, day };
+    return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day)
+        ? { year, month, day }
+        : null;
 };
 
 const formatDateParts = ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-const addMonthNoOverflow = ({ year, month }) => (month === 12
-    ? { year: year + 1, month: 1 }
-    : { year, month: month + 1 });
-
-const addMonthsNoOverflow = (date, months) => {
-    let result = { ...date };
-
-    for (let index = 0; index < months; index++) {
-        const nextMonth = addMonthNoOverflow(result);
-        result = {
-            ...nextMonth,
-            day: Math.min(result.day, daysInMonth(nextMonth.year, nextMonth.month)),
-        };
-    }
-
-    return result;
-};
-
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
+const monthAtOffset = ({ year, month }, offset) => {
+    const date = new Date(year, month - 1 + offset, 1);
 
+    return { year: date.getFullYear(), month: date.getMonth() + 1 };
+};
 const monthKey = ({ year, month }) => `${year}-${String(month).padStart(2, '0')}`;
 
-const cycleForStatementMonth = (billingCycles, statementMonth) => billingCycles.find((cycle) => (
-    String(cycle.closing_date).slice(0, 7) === monthKey(statementMonth)
-));
+export const buildBillingCycleSchedule = (card, startDate, monthsCount) => {
+    const start = toDateParts(startDate);
 
-const statementMonthForPurchase = (purchase, closingDay, billingCycles) => {
-    const purchaseMonth = { year: purchase.year, month: purchase.month };
-    const realClosingDay = toDateParts(cycleForStatementMonth(billingCycles, purchaseMonth)?.closing_date)?.day;
-
-    return purchase.day <= (realClosingDay ?? closingDay)
-        ? purchaseMonth
-        : addMonthNoOverflow(purchaseMonth);
-};
-
-export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-
-    if (purchase === null || card === null) {
-        return null;
-    }
-
-    const billingCycles = Array.isArray(card.billing_cycles)
-        ? [...card.billing_cycles].sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)))
-        : [];
-    const closingDay = Number(card.closing_day) || 1;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay, billingCycles);
-    const matchedCycle = cycleForStatementMonth(billingCycles, statementMonth);
-
-    if (matchedCycle?.due_date) {
-        return matchedCycle.due_date;
-    }
-
-    const dueDay = Number(card.due_day) || closingDay;
-    const dueMonth = closingDay === dueDay ? statementMonth : addMonthNoOverflow(statementMonth);
-
-    return formatDateParts({
-        year: dueMonth.year,
-        month: dueMonth.month,
-        day: Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month)),
-    });
-};
-
-export const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-
-    if (purchase === null || card === null) {
-        return false;
-    }
-
-    const closingDay = Number(card.closing_day) || 1;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay, card.billing_cycles ?? []);
-
-    return Array.isArray(card.billing_cycles)
-        && cycleForStatementMonth(card.billing_cycles, statementMonth) !== undefined;
-};
-
-export const billingCycleForPurchaseDate = (purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-
-    if (purchase === null || !card) {
-        return null;
-    }
-
-    const closingDay = Number(card.closing_day) || 1;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay, card.billing_cycles ?? []);
-    const cycle = cycleForStatementMonth(card.billing_cycles ?? [], statementMonth);
-
-    return {
-        closing_date: cycle?.closing_date ?? formatDateParts({
-            ...statementMonth,
-            day: Math.min(closingDay, daysInMonth(statementMonth.year, statementMonth.month)),
-        }),
-        due_date: calculateFirstInstallmentPaymentDate(purchaseDate, card),
-        is_estimated: !cycle?.due_date,
-    };
-};
-
-export const buildInstallmentPreview = (totalAmount, installmentsCount, purchaseDate, card) => {
-    const purchase = toDateParts(purchaseDate);
-    const count = Number(installmentsCount);
-    const totalCents = Math.round((Number(totalAmount) || 0) * 100);
-
-    if (purchase === null || card === null || String(totalAmount ?? '').trim() === '' || !Number.isInteger(count) || count < 2 || totalCents < 0) {
+    if (!card || !start) {
         return [];
     }
 
-    const billingCycles = Array.isArray(card.billing_cycles) ? [...card.billing_cycles] : [];
+    const realCycles = (Array.isArray(card.billing_cycles) ? card.billing_cycles : [])
+        .map((cycle) => ({ ...cycle, is_estimated: false }))
+        .sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)));
+    const coveredIntervals = realCycles.slice(1).flatMap((cycle, index) => {
+        const previous = realCycles[index];
+        const previousDue = toDateParts(previous.due_date);
+        const nextDue = toDateParts(cycle.due_date);
+        const monthDifference = (nextDue.year - previousDue.year) * 12 + nextDue.month - previousDue.month;
+
+        return monthDifference >= 0 && monthDifference <= 1 ? [[previous.closing_date, cycle.closing_date]] : [];
+    });
     const closingDay = Number(card.closing_day) || 1;
     const dueDay = Number(card.due_day) || closingDay;
-    const statementMonth = statementMonthForPurchase(purchase, closingDay, billingCycles);
+    const replacedMonths = new Set(realCycles.map((cycle) => {
+        const closing = toDateParts(cycle.closing_date);
+        const timestamp = Date.UTC(closing.year, closing.month - 1, closing.day);
+        const candidates = [-1, 0, 1].map((offset) => {
+            const month = monthAtOffset(closing, offset);
+            const day = Math.min(closingDay, daysInMonth(month.year, month.month));
+
+            return { month, distance: Math.abs(Date.UTC(month.year, month.month - 1, day) - timestamp) };
+        });
+
+        return monthKey(candidates.sort((left, right) => left.distance - right.distance)[0].month);
+    }));
+    const cycles = [...realCycles];
+
+    for (let offset = 0; offset < monthsCount; offset++) {
+        const closingMonth = monthAtOffset(start, offset);
+        const dueMonth = monthAtOffset(start, offset + (closingDay === dueDay ? 0 : 1));
+
+        const closingDate = formatDateParts({
+            ...closingMonth, day: Math.min(closingDay, daysInMonth(closingMonth.year, closingMonth.month)),
+        });
+
+        if (replacedMonths.has(monthKey(closingMonth))
+            || coveredIntervals.some(([previous, next]) => closingDate > previous && closingDate < next)) {
+            continue;
+        }
+        cycles.push({
+            id: `estimated-${closingDate}`,
+            closing_date: closingDate,
+            due_date: formatDateParts({
+                ...dueMonth, day: Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month)),
+            }),
+            is_estimated: true,
+        });
+    }
+
+    return cycles.sort((left, right) => String(left.closing_date).localeCompare(String(right.closing_date)));
+};
+
+const scheduleForPurchase = (purchaseDate, card, count) => {
+    if (!card || !toDateParts(purchaseDate)) {
+        return [];
+    }
+
+    let monthsCount = count + 2;
+    let cycles;
+
+    do {
+        cycles = buildBillingCycleSchedule(card, purchaseDate, monthsCount)
+            .filter((cycle) => String(cycle.closing_date) >= purchaseDate);
+        monthsCount += count + 2;
+    } while (cycles.length < count);
+
+    return cycles.slice(0, count);
+};
+
+export const calculateFirstInstallmentPaymentDate = (purchaseDate, card) => (
+    scheduleForPurchase(purchaseDate, card, 1)[0]?.due_date ?? null
+);
+
+export const hasRealCycleForPurchaseDate = (purchaseDate, card) => (
+    scheduleForPurchase(purchaseDate, card, 1)[0]?.is_estimated === false
+);
+
+export const billingCycleForPurchaseDate = (purchaseDate, card) => {
+    const cycle = scheduleForPurchase(purchaseDate, card, 1)[0];
+
+    return cycle ? {
+        closing_date: cycle.closing_date,
+        due_date: cycle.due_date,
+        is_estimated: cycle.is_estimated,
+    } : null;
+};
+
+export const buildInstallmentPreview = (totalAmount, installmentsCount, purchaseDate, card) => {
+    const count = Number(installmentsCount);
+    const totalCents = Math.round((Number(totalAmount) || 0) * 100);
+
+    if (!toDateParts(purchaseDate) || !card || String(totalAmount ?? '').trim() === '' || !Number.isInteger(count) || count < 2 || totalCents < 0) {
+        return [];
+    }
+
     const baseCents = Math.floor(totalCents / count);
     let remainingCents = totalCents;
 
-    return Array.from({ length: count }, (_, index) => {
+    return scheduleForPurchase(purchaseDate, card, count).map((cycle, index) => {
         const amountCents = index === count - 1 ? remainingCents : baseCents;
-        const installmentStatementMonth = addMonthsNoOverflow({ ...statementMonth, day: 1 }, index);
-        const cycle = cycleForStatementMonth(
-            billingCycles,
-            installmentStatementMonth,
-        );
-        const dueMonth = closingDay === dueDay
-            ? installmentStatementMonth
-            : addMonthNoOverflow(installmentStatementMonth);
-        const dueDate = cycle?.due_date ?? formatDateParts({
-            ...dueMonth,
-            day: Math.min(dueDay, daysInMonth(dueMonth.year, dueMonth.month)),
-        });
-
         remainingCents -= amountCents;
 
         return {
             amount: amountCents / 100,
-            due_date: dueDate,
-            due_date_is_estimated: !cycle?.due_date,
+            due_date: cycle.due_date,
+            due_date_is_estimated: cycle.is_estimated,
             installment_number: index + 1,
         };
     });

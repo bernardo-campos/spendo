@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('a billing cycle cannot overlap another real cycle in the same closing month', function () {
+test('billing cycles allow different closing dates in the same month but reject duplicate dates', function () {
     $user = User::factory()->create();
     $card = Card::query()->create([
         'user_id' => $user->id,
@@ -27,7 +27,7 @@ test('a billing cycle cannot overlap another real cycle in the same closing mont
         'closing_date' => '2026-11-20',
         'due_date' => '2026-12-03',
     ]);
-    $message = 'Ya existe un ciclo de facturación para ese mes de cierre en esta tarjeta.';
+    $message = 'Ya existe un ciclo de facturación con esa fecha de cierre en esta tarjeta.';
 
     $this->actingAs($user)
         ->postJson("/cards/{$card->id}/billing-cycles", [
@@ -42,8 +42,7 @@ test('a billing cycle cannot overlap another real cycle in the same closing mont
             'closing_date' => '2026-10-25',
             'due_date' => '2026-11-06',
         ])
-        ->assertUnprocessable()
-        ->assertJsonPath('errors.closing_date.0', $message);
+        ->assertCreated();
 
     $this->actingAs($user)
         ->putJson("/cards/{$card->id}/billing-cycles/{$otherCycle->id}", [

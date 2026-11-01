@@ -1,6 +1,6 @@
 <script setup>
 import { ArrowLeft, ChevronDown, Filter, Search, SlidersHorizontal } from '@lucide/vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
     Dialog,
     DialogClose,
@@ -66,23 +66,52 @@ const props = defineProps({
 const emit = defineEmits(['back', 'create', 'edit', 'update:collapsed-dates', 'save-recurring']);
 
 const GROUPING_STORAGE_KEY = 'spendo:transaction-list-grouping';
+const FILTER_STORAGE_KEY = `spendo:transaction-list-filters:${props.showPaymentMethodFilter ? 'expense' : 'income'}`;
+const defaultSearchFields = ['amount', 'category', 'description', 'place', 'tags', 'notes'];
+const readStoredFilters = () => {
+    try {
+        const stored = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY));
+
+        return stored && typeof stored === 'object' ? stored : {};
+    } catch {
+        return {};
+    }
+};
+const storedFilters = readStoredFilters();
+const restoredSelection = (value, allowed) => Array.isArray(value)
+    ? [...new Set(value.filter((item) => allowed.includes(item)))]
+    : [...allowed];
 const groupingDialogOpen = ref(false);
 const grouping = ref('day');
 const today = ref(formatLocalDate());
 const plannedExpanded = ref(false);
 let todayRefreshInterval;
-const paymentMethodFilter = ref(['cash', 'credit']);
-const currencyFilter = ref(['ARS', 'USD']);
+const paymentMethodFilter = ref(restoredSelection(storedFilters.paymentMethods, ['cash', 'credit']));
+const currencyFilter = ref(restoredSelection(storedFilters.currencies, ['ARS', 'USD']));
 const paymentMethodFilterDialogOpen = ref(false);
 const searchDialogOpen = ref(false);
-const searchQuery = ref('');
-const searchFields = ref(['amount', 'category', 'description', 'place', 'tags', 'notes']);
+const searchQuery = ref(typeof storedFilters.searchQuery === 'string' ? storedFilters.searchQuery : '');
+const searchFields = ref(restoredSelection(storedFilters.searchFields, defaultSearchFields));
 const selectedGrouping = ref('day');
 const selectedPaymentMethodFilter = ref([...paymentMethodFilter.value]);
 const selectedCurrencyFilter = ref([...currencyFilter.value]);
 const selectedSearchFields = ref([...searchFields.value]);
-const selectedSearchQuery = ref('');
-const unconfirmedOnly = ref(false);
+const selectedSearchQuery = ref(searchQuery.value);
+const unconfirmedOnly = ref(props.showPaymentMethodFilter && storedFilters.unconfirmedOnly === true);
+
+watch([paymentMethodFilter, currencyFilter, searchQuery, searchFields, unconfirmedOnly], () => {
+    try {
+        localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+            paymentMethods: paymentMethodFilter.value,
+            currencies: currencyFilter.value,
+            searchQuery: searchQuery.value,
+            searchFields: searchFields.value,
+            unconfirmedOnly: unconfirmedOnly.value,
+        }));
+    } catch {
+        // Keep filtering available when browser storage is unavailable.
+    }
+}, { deep: true, flush: 'sync' });
 const recurringDialogOpen = ref(false);
 const editingRecurring = ref(null);
 const recurringAmount = ref('');

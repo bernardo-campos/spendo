@@ -69,9 +69,9 @@ export const useTransactions = (selectedPeriod, recurringPreview = ref([])) => {
     const recurringExpenses = computed(() => recurringPreview.value
         .filter((item) => item.status !== 'skipped')
         .map((item) => ({
-            id: `recurring-${item.id}-${String(item.charge_date).slice(0, 7)}`,
+            id: `recurring-${item.id}-${item.period ?? String(item.charge_date).slice(0, 7)}`,
             recurring_expense_id: item.id,
-            recurring_period: String(item.charge_date).slice(0, 7),
+            recurring_period: item.period ?? String(item.charge_date).slice(0, 7),
             charge_date: item.charge_date,
             recurring_status: item.status,
             is_unconfirmed_recurring: item.amount_type === 'variable' && item.status === 'pending',

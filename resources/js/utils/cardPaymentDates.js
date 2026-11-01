@@ -87,6 +87,27 @@ export const hasRealCycleForPurchaseDate = (purchaseDate, card) => {
         && cycleForStatementMonth(card.billing_cycles, statementMonth) !== undefined;
 };
 
+export const billingCycleForPurchaseDate = (purchaseDate, card) => {
+    const purchase = toDateParts(purchaseDate);
+
+    if (purchase === null || !card) {
+        return null;
+    }
+
+    const closingDay = Number(card.closing_day) || 1;
+    const statementMonth = statementMonthForPurchase(purchase, closingDay, card.billing_cycles ?? []);
+    const cycle = cycleForStatementMonth(card.billing_cycles ?? [], statementMonth);
+
+    return {
+        closing_date: cycle?.closing_date ?? formatDateParts({
+            ...statementMonth,
+            day: Math.min(closingDay, daysInMonth(statementMonth.year, statementMonth.month)),
+        }),
+        due_date: calculateFirstInstallmentPaymentDate(purchaseDate, card),
+        is_estimated: !cycle?.due_date,
+    };
+};
+
 export const buildInstallmentPreview = (totalAmount, installmentsCount, purchaseDate, card) => {
     const purchase = toDateParts(purchaseDate);
     const count = Number(installmentsCount);

@@ -203,6 +203,7 @@ class RecurringExpenseController extends Controller
             'status' => ['required', Rule::in(['confirmed', 'skipped'])],
             'amount' => ['required_if:status,confirmed', 'nullable', 'numeric', 'gt:0'],
             'description' => ['nullable', 'string', 'max:255'],
+            'charge_date' => ['sometimes', 'required', 'date_format:Y-m-d'],
         ]);
 
         $month = CarbonImmutable::createFromFormat('!Y-m', $validated['period'])->startOfMonth();
@@ -225,6 +226,9 @@ class RecurringExpenseController extends Controller
                 ]);
             }
             $transaction = $occurrence->transaction;
+            $chargeDate = isset($validated['charge_date'])
+                ? CarbonImmutable::parse($validated['charge_date'])
+                : ($transaction?->purchase_date ? CarbonImmutable::parse($transaction->purchase_date) : $chargeDate);
 
             if ($validated['status'] === 'skipped') {
                 $occurrence->update(['status' => 'skipped', 'transaction_id' => null]);

@@ -14,6 +14,7 @@ import { transactionMatchesSearch } from '@/utils/transactionSearch';
 import { filterTransactionsByPaymentAndCurrency } from '@/utils/transactionFilters';
 import { groupTransactions, partitionPlannedDayGroups, plannedPeriodLabel, sumGroupTotals, visibleCurrencyTotals } from '@/utils/transactionGrouping';
 import { formatLocalDate } from '@/utils/localDate';
+import { billingCycleForPurchaseDate } from '@/utils/cardPaymentDates';
 
 const props = defineProps({
     emptyMessage: {
@@ -86,6 +87,10 @@ const recurringDialogOpen = ref(false);
 const editingRecurring = ref(null);
 const recurringAmount = ref('');
 const recurringDescription = ref('');
+const recurringChargeDate = ref('');
+const recurringBillingCycle = computed(() => editingRecurring.value?.payment_method === 'credit'
+    ? billingCycleForPurchaseDate(recurringChargeDate.value, editingRecurring.value.card)
+    : null);
 const confirmingRecurringDelete = ref(false);
 const unconfirmedCount = computed(() => props.transactions.filter((item) => item.is_unconfirmed_recurring).length);
 const openTransaction = (transaction) => {
@@ -97,6 +102,7 @@ const openTransaction = (transaction) => {
     editingRecurring.value = transaction;
     recurringAmount.value = transaction.amount ?? '';
     recurringDescription.value = transaction.description;
+    recurringChargeDate.value = transaction.charge_date;
     confirmingRecurringDelete.value = false;
     recurringDialogOpen.value = true;
 };
@@ -111,6 +117,7 @@ const saveRecurring = (status) => {
         status,
         amount: status === 'confirmed' ? recurringAmount.value : null,
         description: recurringDescription.value,
+        charge_date: recurringChargeDate.value,
     });
     recurringDialogOpen.value = false;
 };
@@ -373,9 +380,18 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{{ editingRecurring?.is_unconfirmed_recurring ? 'Confirmar importe' : 'Editar gasto de este mes' }}</DialogTitle>
-                    <DialogDescription>El cambio afecta solo al cargo de {{ formatTransactionDate(editingRecurring?.charge_date) }}. La regla mensual conserva su importe.</DialogDescription>
+                    <DialogDescription>Los cambios de descripción, importe y fecha afectan solo a este gasto. La regla mensual conserva sus valores.</DialogDescription>
                 </DialogHeader>
                 <form class="grid gap-4" @submit.prevent="saveRecurring('confirmed')">
+                    <label class="grid gap-1 text-sm font-medium">Fecha del gasto
+                        <input v-model="recurringChargeDate" required type="date" class="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                    </label>
+                    <div v-if="recurringBillingCycle" class="grid gap-1 rounded-md bg-slate-100 p-3 text-sm dark:bg-slate-800" aria-live="polite">
+                        <p>Cierre: {{ formatTransactionDate(recurringBillingCycle.closing_date) }}</p>
+                        <p>Vencimiento: {{ formatTransactionDate(recurringBillingCycle.due_date) }}</p>
+                        <p v-if="recurringBillingCycle.is_estimated" class="text-xs text-slate-500 dark:text-slate-400">Fechas estimadas según la configuración de la tarjeta.</p>
+                    </div>
+                    <p v-else-if="editingRecurring?.payment_method !== 'credit'" class="text-sm text-slate-500 dark:text-slate-400">Este gasto no tiene cierre ni vencimiento de tarjeta.</p>
                     <label class="grid gap-1 text-sm font-medium">Descripción
                         <input v-model="recurringDescription" required maxlength="255" class="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                     </label>

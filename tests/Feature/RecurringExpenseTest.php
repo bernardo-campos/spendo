@@ -10,6 +10,56 @@ use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
+test('correcting a subscription charge date preserves its occurrence and monthly rule', function (string $paymentMethod) {
+    $user = User::factory()->create();
+    $card = Card::query()->create([
+        'user_id' => $user->id, 'name' => 'Visa', 'last_four_digits' => '1234',
+        'closing_day' => 10, 'due_day' => 20,
+    ]);
+    $card->billingCycles()->create(['closing_date' => '2026-11-12', 'due_date' => '2026-12-04']);
+    $expense = RecurringExpense::factory()->for($user)->create([
+        'payment_method' => $paymentMethod,
+        'card_id' => $paymentMethod === 'credit' ? $card->id : null,
+        'day_of_month' => 15, 'starts_on' => '2026-10-01', 'ends_on' => '2026-10-31',
+    ]);
+    $url = "/recurring-expenses/{$expense->id}/decisions";
+
+    $this->actingAs($user)->putJson($url, [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1100,
+        'charge_date' => '2026-11-11',
+    ])->assertSuccessful();
+
+    $transaction = Transaction::query()->sole();
+    $paymentDate = $paymentMethod === 'credit' ? '2026-12-04' : '2026-11-11';
+    expect($transaction->purchase_date->toDateString())->toBe('2026-11-11')
+        ->and($transaction->payment_date->toDateString())->toBe($paymentDate)
+        ->and($expense->occurrences()->sole()->period->toDateString())->toBe('2026-10-01');
+
+    $this->getJson('/recurring-expenses/preview?period='.substr($paymentDate, 0, 7))
+        ->assertJsonCount(1)
+        ->assertJsonPath('0.period', '2026-10')
+        ->assertJsonPath('0.charge_date', '2026-11-11')
+        ->assertJsonPath('0.payment_date', $paymentDate);
+
+    $this->putJson($url, [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1200,
+    ])->assertSuccessful();
+    expect(Transaction::query()->count())->toBe(1)
+        ->and($transaction->fresh()->purchase_date->toDateString())->toBe('2026-11-11')
+        ->and($expense->fresh()->day_of_month)->toBe(15)
+        ->and($expense->fresh()->amount)->toBe('1000.00');
+})->with(['cash', 'credit']);
+
+test('subscription charge date corrections require a valid calendar date', function (mixed $date) {
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create(['starts_on' => '2026-10-01']);
+
+    $this->actingAs($user)->putJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1000, 'charge_date' => $date,
+    ])->assertUnprocessable()->assertJsonValidationErrors('charge_date');
+    expect(Transaction::query()->count())->toBe(0);
+})->with(['2026-02-30', 'invalid', null, '']);
+
 test('the expense form fields create a fixed recurring card charge', function () {
     $user = User::factory()->create();
     $card = Card::query()->create([
@@ -434,6 +484,7 @@ test('a bounded recurring expense previews and saves numbered notes without crea
 });
 
 test('the recurring expense form stores its note and numbering choice', function () {
+    $this->travelTo(Carbon::parse('2026-10-20'));
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/recurring-expenses', [

@@ -115,12 +115,14 @@ class RecurringExpensePreviewService
                 ? $latestAmounts->get($expense->series_key)
                 : $expense->amount;
 
-            $chargeDate = $this->chargeDate($expense, $month)->toDateString();
+            $chargeDate = $occurrence?->transaction?->purchase_date?->toDateString()
+                ?? $this->chargeDate($expense, $month)->toDateString();
             $paymentDate = $occurrence?->transaction?->payment_date?->toDateString()
                 ?? $this->cardPaymentDateService->resolve($chargeDate, $expense->payment_method, $expense->card)['date'];
 
             return [
                 'id' => $expense->id,
+                'period' => $month->format('Y-m'),
                 'description' => $occurrence?->transaction?->description ?? $expense->description,
                 'place' => $occurrence?->transaction?->place ?? $expense->place,
                 'notes' => $occurrence?->transaction?->notes ?? $this->noteService->forMonth($expense, $month, $numberedSeries->get($expense->series_key)),

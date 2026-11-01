@@ -514,7 +514,7 @@ onBeforeUnmount(() => window.clearInterval(todayRefreshInterval));
                 <div class="grid gap-4">
                     <label class="grid gap-2 text-sm font-medium">
                         Buscar
-                        <input v-model="selectedSearchQuery" type="search" placeholder="Ingresá un valor" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal dark:border-slate-700 dark:bg-slate-950">
+                        <input v-model="selectedSearchQuery" type="search" placeholder="Ingresá un valor" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal dark:border-slate-700 dark:bg-slate-950" @keydown.enter.prevent="applySearch">
                     </label>
                     <fieldset class="grid gap-2">
                         <legend class="text-sm font-medium">Buscar en</legend>

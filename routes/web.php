@@ -41,7 +41,7 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::get('recurring-expenses/preview', [RecurringExpenseController::class, 'preview']);
     Route::post('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'decide']);
     Route::put('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'saveOccurrence']);
-    Route::apiResource('recurring-expenses', RecurringExpenseController::class)->only(['index', 'store', 'update']);
+    Route::apiResource('recurring-expenses', RecurringExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
     Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);
     Route::put('visualization-preferences', [VisualizationPreferenceController::class, 'update']);

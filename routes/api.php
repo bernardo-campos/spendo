@@ -23,6 +23,6 @@ Route::middleware(['auth:sanctum', 'verified'])->name('api.v1.')->group(function
     Route::get('recurring-expenses/preview', [RecurringExpenseController::class, 'preview'])->name('recurring-expenses.preview');
     Route::post('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'decide'])->name('recurring-expenses.decide');
     Route::put('recurring-expenses/{recurringExpense}/decisions', [RecurringExpenseController::class, 'saveOccurrence'])->name('recurring-expenses.save-occurrence');
-    Route::apiResource('recurring-expenses', RecurringExpenseController::class)->only(['index', 'store', 'update']);
+    Route::apiResource('recurring-expenses', RecurringExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('installment-plans', InstallmentPlanController::class);
 });

@@ -12,6 +12,15 @@ import {
     ComboboxList,
     ComboboxTrigger,
 } from '@/components/ui/combobox';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { formatLocalDate } from '../utils/localDate';
 import { calculateFirstInstallmentPaymentDate } from '../utils/cardPaymentDates';
 import { recurringExpenseSchedule } from '../utils/recurringExpenseSchedule';
@@ -35,9 +44,12 @@ const props = defineProps({
     places: { type: Array, required: true },
     busy: { type: Boolean, default: false },
     offline: { type: Boolean, default: false },
+    error: { type: String, default: '' },
 });
-const emit = defineEmits(['save', 'back']);
+const emit = defineEmits(['save', 'delete', 'back']);
 const editingId = ref(null);
+const editingTimestamps = ref(null);
+const deleteDialogOpen = ref(false);
 const showForm = ref(false);
 const visiblePreviewLimit = ref(60);
 const amountEditorOpen = ref(false);
@@ -61,6 +73,13 @@ const previewRule = computed(() => ({
 }));
 const schedulePreview = computed(() => recurringExpenseSchedule(previewRule.value, visiblePreviewLimit.value));
 const formatPreviewDate = (value) => String(value).split('-').reverse().join('/');
+const formatTimestamp = (value) => {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
+        ? '—'
+        : new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+};
 const expenseCategories = computed(() => props.categories.filter((category) => category.scope === 'expense' || category.scope === 'both'));
 const selectedCategory = computed({
     get: () => expenseCategories.value.find((category) => Number(category.id) === Number(form.value.category_id)) ?? null,
@@ -116,6 +135,10 @@ const edit = (rule) => {
     showForm.value = true;
     formError.value = '';
     editingId.value = rule.id;
+    editingTimestamps.value = {
+        created: rule.series_created_at ?? rule.created_at,
+        updated: rule.series_updated_at ?? rule.updated_at,
+    };
     form.value = {
         description: rule.description,
         place: rule.place ?? '',
@@ -139,6 +162,8 @@ const reset = () => {
     visiblePreviewLimit.value = 60;
     formError.value = '';
     editingId.value = null;
+    editingTimestamps.value = null;
+    deleteDialogOpen.value = false;
     form.value = emptyForm();
 };
 const submit = () => {
@@ -184,6 +209,11 @@ defineExpose({ reset });
                 </button>
                 <h2 class="text-base font-semibold">{{ editingId ? 'Editar gasto recurrente' : 'Crear gasto recurrente' }}</h2>
             </div>
+
+            <dl v-if="editingId" class="mb-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2 dark:text-slate-400">
+                <div><dt class="font-medium">Creado</dt><dd><time :datetime="editingTimestamps?.created">{{ formatTimestamp(editingTimestamps?.created) }}</time></dd></div>
+                <div><dt class="font-medium">Última modificación</dt><dd><time :datetime="editingTimestamps?.updated">{{ formatTimestamp(editingTimestamps?.updated) }}</time></dd></div>
+            </dl>
 
             <p v-if="offline" class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">Conectate para consultar o modificar las recurrencias.</p>
             <form v-else class="space-y-3" @submit.prevent="submit">
@@ -344,7 +374,21 @@ defineExpose({ reset });
                     <button type="submit" class="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" :disabled="busy">{{ busy ? 'Guardando...' : (editingId ? 'Guardar cambios' : 'Crear recurrencia') }}</button>
                     <button type="button" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" @click="reset">Cancelar</button>
                 </div>
+                <button v-if="editingId" type="button" class="text-sm font-medium text-red-700 underline underline-offset-2 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" :disabled="busy" @click="deleteDialogOpen = true">Eliminar gasto recurrente</button>
             </form>
+            <Dialog v-model:open="deleteDialogOpen">
+                <DialogContent class="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Eliminar gasto recurrente</DialogTitle>
+                        <DialogDescription>Se eliminará «{{ form.description }}», todas las versiones de esta recurrencia y sus gastos mensuales guardados. Los cargos previstos también dejarán de aparecer. Esta acción no se puede deshacer.</DialogDescription>
+                    </DialogHeader>
+                    <p v-if="error" class="text-sm text-red-700 dark:text-red-400" role="alert">{{ error }}</p>
+                    <DialogFooter>
+                        <DialogClose as-child><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700" :disabled="busy">Cancelar</button></DialogClose>
+                        <button type="button" class="rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-500" :disabled="busy" @click="emit('delete', editingId)">{{ busy ? 'Eliminando...' : 'Eliminar todo' }}</button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <AmountEditor v-model:amount="form.amount" :format-amount="formatAmount" :open="amountEditorOpen" @close="closeAmountEditor" />
         </article>
 

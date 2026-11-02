@@ -515,6 +515,23 @@ const saveRecurringRule = async ({ id, payload }) => {
     }
 };
 
+const deleteRecurringRule = async (id) => {
+    recurringBusy.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+        await window.axios.delete(`/recurring-expenses/${id}`);
+        invalidateTransactions();
+        await Promise.all([loadRecurringRules(), loadRecurringPreview(), loadTransactions({ force: true })]);
+        recurringPage.value?.reset();
+        successMessage.value = 'Gasto recurrente y sus gastos mensuales eliminados.';
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? 'No fue posible eliminar el gasto recurrente.';
+    } finally {
+        recurringBusy.value = false;
+    }
+};
+
 const saveRecurringOccurrence = async ({ id, period, status, amount, description, charge_date }) => {
     recurringBusy.value = true;
     errorMessage.value = '';
@@ -911,7 +928,7 @@ const deleteTransaction = async () => {
 
         <TransactionListPage v-if="activeScreen === 'expense-list'" :collapsed-dates="collapsedDatesByList.expense" :display-preferences="expenseListDisplayPreferences" empty-message="No hay egresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :recurring-busy="recurringBusy" :selected-period="selectedPeriod" :show-payment-method-filter="true" title="Egresos" :transactions="expenseTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('expense')" @edit="openTransactionEdit" @save-recurring="saveRecurringOccurrence" @update:collapsed-dates="updateCollapsedDates('expense', $event)" />
 
-        <RecurringExpensesPage v-if="activeScreen === 'recurring-expenses'" ref="recurringPage" :rules="recurringRules" :cards="cards" :categories="categories" :places="places" :selected-period="selectedPeriod" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :busy="recurringBusy" :offline="recurringOffline" @save="saveRecurringRule" @back="setActiveScreenFromMenu('expense-list')" />
+        <RecurringExpensesPage v-if="activeScreen === 'recurring-expenses'" ref="recurringPage" :rules="recurringRules" :cards="cards" :categories="categories" :places="places" :selected-period="selectedPeriod" :format-amount="formatAmount" :format-currency-amount="formatCurrencyAmount" :busy="recurringBusy" :offline="recurringOffline" :error="errorMessage" @save="saveRecurringRule" @delete="deleteRecurringRule" @back="setActiveScreenFromMenu('expense-list')" />
 
         <DashboardPage v-if="activeScreen === 'dashboard'" :cards-summary="cardsSummary" :format-currency-amount="formatCurrencyAmount" :format-date="formatDate" :loading="loading" :recent-transactions="dashboardRecentTransactions" :recurring-pending-count="recurringPendingCount" @create-expense="openTransactionForm('expense')" @create-exchange="openExchangeForm" @navigate="setActiveScreenFromMenu" />
 

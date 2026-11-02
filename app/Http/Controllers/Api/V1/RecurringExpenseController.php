@@ -36,6 +36,22 @@ class RecurringExpenseController extends Controller
             ->orderBy('description')
             ->get();
 
+        $timestampsBySeries = DB::table('recurring_expenses')
+            ->where('user_id', $request->user()->id)
+            ->whereIn('series_key', $expenses->pluck('series_key'))
+            ->select('series_key')
+            ->selectRaw('MIN(created_at) as first_created_at, MAX(updated_at) as last_updated_at')
+            ->groupBy('series_key')
+            ->get()
+            ->keyBy('series_key');
+
+        $expenses->each(function (RecurringExpense $expense) use ($timestampsBySeries): void {
+            $timestamps = $timestampsBySeries->get($expense->series_key);
+
+            $expense->setAttribute('series_created_at', CarbonImmutable::parse($timestamps?->first_created_at ?? $expense->created_at, config('app.timezone'))->toISOString());
+            $expense->setAttribute('series_updated_at', CarbonImmutable::parse($timestamps?->last_updated_at ?? $expense->updated_at, config('app.timezone'))->toISOString());
+        });
+
         if ($request->routeIs('api.v1.*')) {
             return RecurringExpenseResource::collection($expenses)->response();
         }
@@ -124,6 +140,32 @@ class RecurringExpenseController extends Controller
         }
 
         return response()->json($expense);
+    }
+
+    public function destroy(Request $request, RecurringExpense $recurringExpense): JsonResponse
+    {
+        abort_unless($recurringExpense->user_id === $request->user()?->id, 404);
+
+        DB::transaction(function () use ($request, $recurringExpense): void {
+            $rules = RecurringExpense::query()
+                ->where('user_id', $request->user()->id)
+                ->when(
+                    $recurringExpense->series_key !== null,
+                    fn ($query) => $query->where('series_key', $recurringExpense->series_key),
+                    fn ($query) => $query->whereKey($recurringExpense->id),
+                )
+                ->lockForUpdate()
+                ->pluck('id');
+
+            Transaction::query()
+                ->where('user_id', $request->user()->id)
+                ->whereHas('recurringExpenseOccurrence', fn ($query) => $query->whereIn('recurring_expense_id', $rules))
+                ->delete();
+
+            RecurringExpense::query()->whereKey($rules)->delete();
+        });
+
+        return response()->json(status: 204);
     }
 
     public function decide(Request $request, RecurringExpense $recurringExpense): JsonResponse

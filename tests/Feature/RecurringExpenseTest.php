@@ -3,6 +3,7 @@
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\RecurringExpense;
+use App\Models\RecurringExpenseOccurrence;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,6 +95,101 @@ test('the expense form fields create a fixed recurring card charge', function ()
         ->assertJsonPath('card_id', $card->id)
         ->assertJsonPath('category_id', $category->id)
         ->assertJsonPath('amount', '15900.00');
+});
+
+test('editing a recurring rule shows its original creation and latest modification dates', function () {
+    $this->travelTo(Carbon::parse('2026-10-02 10:00:00'));
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create(['starts_on' => '2026-10-01']);
+    $originalCreatedAt = $expense->created_at->toISOString();
+
+    $this->travelTo(Carbon::parse('2026-11-02 11:00:00'));
+    $this->actingAs($user)->putJson("/recurring-expenses/{$expense->id}", [
+        'description' => $expense->description,
+        'payment_method' => 'cash', 'currency' => 'USD',
+        'amount_type' => 'fixed', 'amount' => 1000,
+        'day_of_month' => $expense->day_of_month,
+        'starts_on' => '2026-10-01', 'effective_period' => '2026-11',
+    ])->assertSuccessful();
+
+    $this->getJson('/recurring-expenses')
+        ->assertSuccessful()
+        ->assertJsonCount(1)
+        ->assertJsonPath('0.series_created_at', $originalCreatedAt)
+        ->assertJsonPath('0.series_updated_at', now()->toISOString());
+});
+
+test('a recurring rule without a series key still shows its own dates', function () {
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create();
+    $expense->update(['series_key' => null]);
+
+    $this->actingAs($user)->getJson('/recurring-expenses')
+        ->assertSuccessful()
+        ->assertJsonPath('0.series_created_at', $expense->created_at->toISOString())
+        ->assertJsonPath('0.series_updated_at', $expense->fresh()->updated_at->toISOString());
+});
+
+test('deleting a recurring expense removes every version and its saved monthly expenses', function () {
+    $this->travelTo(Carbon::parse('2026-11-20'));
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create(['starts_on' => '2026-09-01']);
+    $unrelated = RecurringExpense::factory()->for($user)->create(['starts_on' => '2026-09-01']);
+
+    $this->actingAs($user)->postJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-09', 'status' => 'skipped',
+    ])->assertCreated();
+    $this->postJson("/recurring-expenses/{$expense->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 1000,
+    ])->assertCreated();
+    $unrelatedResponse = $this->postJson("/recurring-expenses/{$unrelated->id}/decisions", [
+        'period' => '2026-10', 'status' => 'confirmed', 'amount' => 500,
+    ])->assertCreated();
+
+    $revisedId = $this->putJson("/recurring-expenses/{$expense->id}", [
+        'description' => $expense->description,
+        'payment_method' => 'cash', 'currency' => 'USD',
+        'amount_type' => 'fixed', 'amount' => 1200,
+        'day_of_month' => $expense->day_of_month,
+        'starts_on' => '2026-09-01', 'effective_period' => '2026-11',
+    ])->assertSuccessful()->json('id');
+
+    $this->postJson("/recurring-expenses/{$revisedId}/decisions", [
+        'period' => '2026-11', 'status' => 'confirmed', 'amount' => 1200,
+    ])->assertCreated();
+
+    $this->deleteJson("/recurring-expenses/{$revisedId}")->assertNoContent();
+
+    expect(RecurringExpense::query()->pluck('id')->all())->toBe([$unrelated->id])
+        ->and(RecurringExpenseOccurrence::query()->count())->toBe(1)
+        ->and(Transaction::query()->pluck('id')->all())->toBe([$unrelatedResponse->json('transaction_id')]);
+
+    $this->getJson('/recurring-expenses/preview?period=2026-11')
+        ->assertSuccessful()
+        ->assertJsonCount(1)
+        ->assertJsonPath('0.id', $unrelated->id);
+});
+
+test('users cannot delete another users recurring expense', function () {
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->create();
+
+    $this->actingAs($user)->deleteJson("/recurring-expenses/{$expense->id}")->assertNotFound();
+
+    $this->assertModelExists($expense);
+});
+
+test('deleting a rule without a series key does not delete other ungrouped rules', function () {
+    $user = User::factory()->create();
+    $expense = RecurringExpense::factory()->for($user)->create();
+    $unrelated = RecurringExpense::factory()->for($user)->create();
+    $expense->update(['series_key' => null]);
+    $unrelated->update(['series_key' => null]);
+
+    $this->actingAs($user)->deleteJson("/api/v1/recurring-expenses/{$expense->id}")->assertNoContent();
+
+    $this->assertModelMissing($expense);
+    $this->assertModelExists($unrelated);
 });
 
 test('monthly previews do not persist future transactions or occurrences', function () {

@@ -21,6 +21,8 @@ Hay dos tipos de importe:
 
 Al seleccionar un cargo recurrente en Egresos se abre la edición **de ese mes**. Guardar un importe variable lo confirma. También se puede cambiar el importe o la descripción de un fijo solo para ese mes, o elegir **Eliminar este mes** para omitir el cargo. Estas acciones no modifican la regla ni los demás meses.
 
+Desde la edición de la regla se puede elegir **Eliminar gasto recurrente**. Tras confirmar, se eliminan todas las versiones de esa recurrencia, sus decisiones mensuales y las transacciones guardadas que le pertenecen. Los cargos calculados dejan de aparecer. Otras recurrencias y gastos independientes se conservan.
+
 Cuando el período seleccionado contiene variables sin confirmar, Egresos muestra **«Tiene importes sin confirmar»** y el botón **Ver sin confirmar**. El mismo botón pasa a **Quitar filtro** al activarse. El dashboard avisa sobre importes variables sin confirmar cuya fecha de cargo ya llegó.
 
 Los importes variables aproximados no se suman a los totales hasta confirmarse. Los fijos visibles y los variables confirmados sí se incluyen.
@@ -50,6 +52,7 @@ Las rutas web autenticadas están disponibles también bajo `/api/v1`:
 | `GET` | `/recurring-expenses` | Listar reglas vigentes. |
 | `POST` | `/recurring-expenses` | Crear una regla. |
 | `PUT` | `/recurring-expenses/{id}` | Cambiar una regla desde `effective_period`. |
+| `DELETE` | `/recurring-expenses/{id}` | Eliminar toda la serie de reglas y sus gastos mensuales guardados. |
 | `GET` | `/recurring-expenses/preview?period=YYYY-MM` | Calcular los cargos del mes sin persistirlos. |
 | `PUT` | `/recurring-expenses/{id}/decisions` | Guardar, volver a editar u omitir un mes mediante `period`, `status`, `amount` y, opcionalmente, `description`. |
 | `POST` | `/recurring-expenses/{id}/decisions` | Registrar por primera vez una confirmación u omisión; rechaza decisiones repetidas. |

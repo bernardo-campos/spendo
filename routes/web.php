@@ -13,6 +13,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GmailForwardingVerificationController;
 use App\Http\Controllers\ReceiptImportAddressController;
 use App\Http\Controllers\ReceiptImportSettingsController;
+use App\Http\Controllers\TransactionSearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -35,6 +36,7 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::apiResource('cards.billing-cycles', CardBillingCycleController::class)
         ->parameters(['billing-cycles' => 'billingCycle']);
     Route::get('transactions/places', [TransactionController::class, 'places']);
+    Route::get('transaction-search', TransactionSearchController::class)->name('transactions.search');
     Route::get('currency-exchanges/latest', [CurrencyExchangeController::class, 'latest']);
     Route::apiResource('currency-exchanges', CurrencyExchangeController::class)->except('index');
     Route::apiResource('transactions', TransactionController::class);

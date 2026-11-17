@@ -19,6 +19,7 @@ import DashboardPage from '../pages/DashboardPage.vue';
 import TagsPage from '../pages/TagsPage.vue';
 import TransactionFormPage from '../pages/TransactionFormPage.vue';
 import TransactionListPage from '../pages/TransactionListPage.vue';
+import TransactionSearchPage from '../pages/TransactionSearchPage.vue';
 import RecurringExpensesPage from '../pages/RecurringExpensesPage.vue';
 import ReceiptImportPage from '../pages/ReceiptImportPage.vue';
 import VisualizationPage from '../pages/VisualizationPage.vue';
@@ -92,6 +93,40 @@ const {
     loadTransactions,
     transactionsLoading,
 } = useTransactions(selectedPeriod, recurringPreview);
+
+const transactionSearchForm = ref({
+    type: 'expense', date_scope: 'period', period: selectedPeriod.value,
+    date_from: '', date_to: '', description: '', place: '', notes: '',
+    amount_min: '', amount_max: '', category_id: '', tag_ids: [],
+    currency: '', payment_method: '', card_id: '',
+});
+const transactionSearchResults = ref(null);
+const transactionSearchLoading = ref(false);
+const transactionSearchError = ref('');
+const appliedTransactionSearch = ref(null);
+
+const searchTransactions = async (page = null) => {
+    if (transactionSearchLoading.value) {
+        return;
+    }
+    const filters = page === null ? { ...transactionSearchForm.value, tag_ids: [...transactionSearchForm.value.tag_ids] } : appliedTransactionSearch.value;
+    if (!filters) {
+        return;
+    }
+    transactionSearchLoading.value = true;
+    transactionSearchError.value = '';
+    try {
+        const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '' && value !== null));
+        const response = await window.axios.get('/transaction-search', { params: { ...params, page: page ?? 1 } });
+        appliedTransactionSearch.value = filters;
+        transactionSearchResults.value = response.data;
+    } catch (error) {
+        transactionSearchError.value = Object.values(error?.response?.data?.errors ?? {}).flat().join(' ')
+            || 'No fue posible realizar la búsqueda. Verificá tu conexión e intentá nuevamente.';
+    } finally {
+        transactionSearchLoading.value = false;
+    }
+};
 
 const userInitials = computed(() => userName
     .split(' ')
@@ -689,6 +724,11 @@ watch(
             return;
         }
 
+        if (screen === 'search') {
+            await runWithLoading(ensureTransactionFormData, 'No fue posible cargar los filtros de búsqueda.');
+            return;
+        }
+
         if (screen === 'categories') {
             await runWithLoading(loadCategories, 'No fue posible cargar las categorías.');
             return;
@@ -923,6 +963,8 @@ const deleteTransaction = async () => {
                 </form>
             </div>
         </template>
+
+        <TransactionSearchPage v-if="activeScreen === 'search'" :form="transactionSearchForm" :categories="categories" :tags="tags" :cards="cards" :results="transactionSearchResults" :applied-filters="appliedTransactionSearch" :loading="transactionSearchLoading" :error="transactionSearchError" :format-currency-amount="formatCurrencyAmount" @search="searchTransactions()" @page="searchTransactions($event)" />
 
         <TransactionListPage v-if="activeScreen === 'income-list'" :collapsed-dates="collapsedDatesByList.income" empty-message="No hay ingresos registrados." :format-currency-amount="formatCurrencyAmount" :loading="loading" :selected-period="selectedPeriod" title="Ingresos" :transactions="incomeTransactions" @back="setActiveScreenFromMenu('dashboard')" @create="openTransactionForm('income')" @edit="openTransactionEdit" @update:collapsed-dates="updateCollapsedDates('income', $event)" />
 

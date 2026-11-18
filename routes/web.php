@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Controllers\Api\V1\VisualizationPreferenceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GmailForwardingVerificationController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ReceiptImportAddressController;
 use App\Http\Controllers\ReceiptImportSettingsController;
 use App\Http\Controllers\TransactionSearchController;
@@ -48,6 +49,9 @@ Route::middleware(['auth', 'verified', 'idempotent'])->group(function () {
     Route::get('visualization-preferences', [VisualizationPreferenceController::class, 'show']);
     Route::put('visualization-preferences', [VisualizationPreferenceController::class, 'update']);
     Route::get('receipt-import-address', [ReceiptImportAddressController::class, 'show']);
+    Route::get('push-subscriptions', [PushSubscriptionController::class, 'index'])->name('push-subscriptions.index');
+    Route::post('push-subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:30,1')->name('push-subscriptions.store');
+    Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
     Route::post('receipt-import-address', [ReceiptImportAddressController::class, 'store'])->middleware('throttle:6,1');
     Route::post('receipt-import-address/rotate', [ReceiptImportAddressController::class, 'rotate'])->middleware('throttle:6,1');
     Route::get('receipt-import-settings', [ReceiptImportSettingsController::class, 'index']);

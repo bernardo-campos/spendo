@@ -1,6 +1,14 @@
+import { disablePushNotifications } from './pushNotifications.js';
+
 export const submitLogout = async (event, offlineClient, cacheStorage = globalThis.caches, serviceWorker = navigator.serviceWorker) => {
     const form = event.currentTarget;
     event.preventDefault();
+
+    try {
+        await disablePushNotifications(globalThis.axios, serviceWorker);
+    } catch (error) {
+        console.error('No fue posible desvincular las notificaciones al cerrar sesión.', error);
+    }
 
     try {
         await offlineClient.clear();

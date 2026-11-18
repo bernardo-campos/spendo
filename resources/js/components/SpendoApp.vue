@@ -9,6 +9,7 @@ import { useTransactionForm } from '../composables/useTransactionForm';
 import { useTransactions } from '../composables/useTransactions';
 import { offlineClient } from '../services/offlineClient';
 import { submitLogout as submitLogoutForm } from '../services/logout';
+import { createPushNotifications } from '../services/pushNotifications';
 import { currentLocalPeriod, formatLocalDate } from '../utils/localDate';
 import { exchangeReferenceAmounts, suggestedExchangeAmount } from '../utils/exchangeSuggestion';
 import AdminLayout from './admin/AdminLayout.vue';
@@ -61,6 +62,11 @@ const savingReceiptProvider = ref(null);
 const receiptVerifications = ref([]);
 const loadingReceiptVerifications = ref(false);
 const dismissingReceiptVerification = ref(null);
+const pushNotifications = createPushNotifications(window.axios);
+const pushState = ref({ supported: false, configured: false, enabled: false });
+const loadingPush = ref(true);
+const savingPush = ref(false);
+const pushError = ref('');
 const expenseListDisplayPreferences = ref({ ...EXPENSE_LIST_DISPLAY_DEFAULTS });
 const offlineSyncState = offlineClient.syncState;
 const places = ref([]);
@@ -138,6 +144,38 @@ const userInitials = computed(() => userName
 
 const updateCollapsedDates = (list, dates) => {
     collapsedDatesByList.value[list] = dates;
+};
+
+const loadPushNotifications = async () => {
+    loadingPush.value = true;
+    pushError.value = '';
+
+    try {
+        pushState.value = await pushNotifications.initialize();
+    } catch {
+        pushError.value = 'No fue posible consultar las notificaciones. Recargá la página para reintentar.';
+    } finally {
+        loadingPush.value = false;
+    }
+};
+
+const togglePushNotifications = async () => {
+    savingPush.value = true;
+    pushError.value = '';
+
+    try {
+        if (pushState.value.enabled) {
+            await pushNotifications.disable();
+            pushState.value.enabled = false;
+        } else {
+            await pushNotifications.enable(pushState.value.publicKey);
+            pushState.value.enabled = true;
+        }
+    } catch (error) {
+        pushError.value = error?.response?.data?.message ?? error?.message ?? 'No fue posible actualizar las notificaciones.';
+    } finally {
+        savingPush.value = false;
+    }
 };
 
 const loadVisualizationPreferences = async () => {
@@ -643,6 +681,7 @@ const openExchangeEdit = async (exchangeId, returnScreen = 'expense-list') => {
 
 onMounted(() => {
     void loadVisualizationPreferences();
+    void loadPushNotifications();
 
     if (activeScreen.value !== 'transaction-form') {
         return;
@@ -985,7 +1024,7 @@ const deleteTransaction = async () => {
         <TagsPage v-if="activeScreen === 'tags'" :form="tagForm" :saving="savingTag" :tags="tags" @edit="editTag" @remove="removeTag" @reset="resetTagForm" @submit="submitTag" />
 
         <VisualizationPage v-if="activeScreen === 'visualization'" :loading="loadingVisualizationPreferences" :preferences="expenseListDisplayPreferences" :saving="savingVisualizationPreferences" @submit="saveVisualizationPreferences" />
-        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :providers="receiptProviders" :categories="categories" :places="places" :verifications="receiptVerifications" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" :saving-provider="savingReceiptProvider" :loading-verifications="loadingReceiptVerifications" :dismissing-verification="dismissingReceiptVerification" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" @save-settings="saveReceiptProviderSettings" @refresh-verifications="loadReceiptVerifications" @dismiss-verification="dismissReceiptVerification" />
+        <ReceiptImportPage v-if="activeScreen === 'receipt-import'" :address="receiptAddress" :providers="receiptProviders" :categories="categories" :places="places" :verifications="receiptVerifications" :loading="loadingReceiptAddress" :saving="savingReceiptAddress" :saving-provider="savingReceiptProvider" :loading-verifications="loadingReceiptVerifications" :dismissing-verification="dismissingReceiptVerification" :push-state="pushState" :loading-push="loadingPush" :saving-push="savingPush" :push-error="pushError" @toggle-push="togglePushNotifications" @generate="generateReceiptAddress" @rotate="rotateReceiptAddress" @save-settings="saveReceiptProviderSettings" @refresh-verifications="loadReceiptVerifications" @dismiss-verification="dismissReceiptVerification" />
 
             <p v-if="errorMessage" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="successMessage" class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ successMessage }}</p>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { ClipboardCopy, ExternalLink, MailPlus, MapPin, RefreshCw } from '@lucide/vue';
+import { Bell, ClipboardCopy, ExternalLink, MailPlus, MapPin, RefreshCw } from '@lucide/vue';
 
 const props = defineProps({
     address: { type: String, default: null },
@@ -13,9 +13,13 @@ const props = defineProps({
     loadingVerifications: { type: Boolean, required: true },
     dismissingVerification: { type: Number, default: null },
     savingProvider: { type: String, default: null },
+    pushState: { type: Object, required: true },
+    loadingPush: { type: Boolean, required: true },
+    savingPush: { type: Boolean, required: true },
+    pushError: { type: String, default: '' },
 });
 
-const emit = defineEmits(['generate', 'rotate', 'save-settings', 'refresh-verifications', 'dismiss-verification']);
+const emit = defineEmits(['generate', 'rotate', 'save-settings', 'refresh-verifications', 'dismiss-verification', 'toggle-push']);
 const addressInput = ref(null);
 const copyFeedback = ref('');
 const selectedCategories = reactive({});
@@ -119,6 +123,21 @@ const copyAddress = async () => {
                     {{ saving ? 'Generando...' : 'Generar dirección' }}
                 </button>
             </div>
+        </article>
+
+        <article class="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <h3 class="flex items-center gap-2 text-base font-semibold"><Bell class="size-4" /> Notificaciones de gastos importados</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Recibí un aviso en este dispositivo cuando un recibo por correo cree un gasto. Al tocarlo, podés revisar el gasto.</p>
+            <p v-if="loadingPush" class="text-sm text-slate-500 dark:text-slate-400">Consultando notificaciones...</p>
+            <p v-else-if="pushError" role="alert" class="text-sm text-red-700 dark:text-red-300">{{ pushError }}</p>
+            <p v-else-if="!pushState.supported" class="text-sm text-slate-500 dark:text-slate-400">Las notificaciones no están disponibles en este navegador. En iPhone o iPad, abrí Spendo desde la pantalla de inicio.</p>
+            <p v-else-if="!pushState.configured" class="text-sm text-slate-500 dark:text-slate-400">Las notificaciones todavía no están habilitadas en Spendo.</p>
+            <template v-else>
+                <p role="status" class="text-sm text-slate-500 dark:text-slate-400">{{ pushState.enabled ? 'Activadas en este dispositivo.' : 'Desactivadas en este dispositivo.' }}</p>
+            </template>
+            <button v-if="!loadingPush && pushState.supported && pushState.configured" type="button" :disabled="savingPush" class="justify-self-start rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800" @click="emit('toggle-push')">
+                {{ savingPush ? 'Actualizando...' : (pushState.enabled ? 'Desactivar notificaciones' : 'Activar notificaciones') }}
+            </button>
         </article>
 
         <article class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">

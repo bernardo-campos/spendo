@@ -2,6 +2,7 @@ import './bootstrap';
 import { createApp } from 'vue';
 import SpendoApp from './components/SpendoApp.vue';
 import { offlineClient } from './services/offlineClient';
+import { unsubscribeBrowserPush } from './services/pushNotifications';
 
 const rootElement = document.getElementById('spendo-app');
 
@@ -14,6 +15,7 @@ if (rootElement) {
             await navigator.serviceWorker.ready;
 
             if (changedUser) {
+                await unsubscribeBrowserPush(navigator.serviceWorker);
                 (registration.active ?? registration.waiting)?.postMessage({ type: 'CLEAR_PRIVATE_OFFLINE_DATA' });
             }
         }

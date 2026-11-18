@@ -41,6 +41,15 @@ modificar el servidor. La configuración de un servidor está más abajo.
 El campo `From` del ejemplo se conserva dentro del mensaje, pero aún no se usa
 para identificar al usuario.
 
+## Notificaciones del gasto importado
+
+Spendo puede enviar un aviso Web Push cuando se crea un gasto nuevo desde un
+recibo reconocido. Requiere configuración VAPID en el servidor, una suscripción
+activa del usuario y un worker de colas. No basta con que el correo se procese:
+consultar la [guía de notificaciones push](notificaciones-push.md) para los valores
+esperados, los pasos de activación y las limitaciones. Un recibo duplicado o
+pendiente no genera otro aviso.
+
 ## Configurar un dominio receptor y Postfix en Linux
 
 Este ejemplo usa `recibos.ejemplo.com` para las direcciones de importación y

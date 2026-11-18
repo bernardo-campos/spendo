@@ -42,6 +42,44 @@ self.addEventListener('fetch', (event) => {
     }
 });
 
+self.addEventListener('push', (event) => {
+    let message;
+
+    try {
+        message = event.data?.json() ?? {};
+    } catch {
+        message = {};
+    }
+
+    event.waitUntil(self.registration.showNotification(message.title || 'Spendo', {
+        body: message.body || 'Tenés una nueva notificación.',
+        icon: '/android-chrome-192x192.png',
+        tag: message.tag,
+        data: { url: message.data?.url ?? '/app' },
+    }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const requestedUrl = new URL(event.notification.data?.url ?? '/app', self.location.origin);
+    const url = requestedUrl.origin === self.location.origin && requestedUrl.pathname.startsWith('/app/')
+        ? requestedUrl.href
+        : new URL('/app', self.location.origin).href;
+
+    event.waitUntil((async () => {
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
+
+        if (existing) {
+            const navigated = await existing.navigate(url);
+            await (navigated ?? existing).focus();
+        } else {
+            await self.clients.openWindow(url);
+        }
+    })());
+});
+
 async function cacheAppShell(assets) {
     const response = await fetch(APP_SHELL, { credentials: 'include' });
 

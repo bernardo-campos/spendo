@@ -25,6 +25,7 @@ test('clears private offline data before submitting logout', async () => {
     const serviceWorker = { controller: { postMessage: ({ type }) => calls.push(type) } };
 
     const logout = submitLogout(event, offlineClient, cacheStorage, serviceWorker);
+    await new Promise(setImmediate);
     assert.deepEqual(calls, ['preventDefault', 'clear-start']);
 
     event.currentTarget = null;
@@ -38,6 +39,32 @@ test('clears private offline data before submitting logout', async () => {
         'delete:spendo-private-shell-v1',
         'delete:spendo-private-shell-v2',
         'CLEAR_PRIVATE_OFFLINE_DATA',
+        'submit',
+    ]);
+});
+
+test('logout removes push from the account and browser before submitting the form', async () => {
+    const calls = [];
+    const previousHttp = globalThis.axios;
+    globalThis.axios = { delete: async (path, options) => { calls.push([path, options]); } };
+
+    try {
+        await submitLogout({
+            preventDefault() {},
+            currentTarget: { submit: () => { calls.push('submit'); } },
+        }, { clear: async () => {} }, null, {
+            getRegistration: async () => ({ pushManager: { getSubscription: async () => ({
+                endpoint: 'https://web.push.apple.com/device',
+                unsubscribe: async () => { calls.push('unsubscribe'); return true; },
+            }) } }),
+        });
+    } finally {
+        globalThis.axios = previousHttp;
+    }
+
+    assert.deepEqual(calls, [
+        ['/push-subscriptions', { data: { endpoint: 'https://web.push.apple.com/device' } }],
+        'unsubscribe',
         'submit',
     ]);
 });

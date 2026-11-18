@@ -19,6 +19,7 @@ Aplicación web para gestión de finanzas personales (ingresos, egresos, tarjeta
   - notas opcionales.
 - [Gastos recurrentes](docs/gastos-recurrentes.md) con importes fijos automáticos y variables aproximados hasta su confirmación.
 - [Importación de recibos por correo](docs/importacion-recibos.md): recepción de correos de Uber y creación automática de egresos en Efectivo cuando se reconocen sus datos, con guía de prueba manual local.
+- [Notificaciones Web Push](docs/notificaciones-push.md) para los gastos creados desde recibos: configuración VAPID, activación por dispositivo, operación de colas y prueba local con Tinker confirmada.
 - Gestión de tarjetas:
   - nombre,
   - últimos 4 dígitos,
@@ -172,6 +173,12 @@ Variables de entorno disponibles:
 - `TURNSTILE_SECRET_KEY`: clave privada utilizada únicamente por el servidor.
 - `TURNSTILE_EXPECTED_HOSTNAME`: hostname esperado en la validación de
   Turnstile. Si se omite, se obtiene de `APP_URL`.
+- `VAPID_SUBJECT`: contacto del responsable del envío push, por ejemplo un
+  `mailto:` con una dirección real. No se usa para enviar emails.
+- `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`: par de claves generado una sola vez
+  por entorno mediante `php artisan webpush:vapid`. La privada queda en el
+  servidor. Ver [configuración y activación de Web Push](docs/notificaciones-push.md)
+  antes de generar o reemplazar claves existentes.
 
 **TODO:** decidir si `SPENDO_CURRENCY` y `SPENDO_CURRENCY_SYMBOL` deben
 tener un uso concreto o eliminarse de la configuración.

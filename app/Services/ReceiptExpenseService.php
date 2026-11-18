@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Enums\PaymentMethodType;
 use App\Enums\TransactionCurrency;
 use App\Models\Transaction;
+use App\Models\User;
+use App\Notifications\ExpenseCreatedFromEmail;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use stdClass;
+use Throwable;
 
 class ReceiptExpenseService
 {
@@ -76,6 +79,22 @@ class ReceiptExpenseService
             'status' => 'imported',
             'updated_at' => now(),
         ]);
+
+        DB::afterCommit(function () use ($transaction): void {
+            try {
+                if (! app(WebPushConfiguration::class)->isConfigured()) {
+                    return;
+                }
+
+                $user = User::query()->find($transaction->user_id);
+
+                if ($user !== null && $user->pushSubscriptions()->exists()) {
+                    $user->notify(new ExpenseCreatedFromEmail($transaction));
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
     }
 
     private function shortAddress(?string $address): ?string

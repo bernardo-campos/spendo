@@ -99,7 +99,18 @@ else
     echo "==> Sin cambios de frontend."
 fi
 
+echo "==> Limpiando configuración anterior..."
+php artisan config:clear --no-interaction
+
 echo "==> Ejecutando migraciones..."
-php artisan migrate --force
+php artisan migrate --force --no-interaction
+
+echo "==> Actualizando caché de configuración..."
+php artisan config:cache --no-interaction
+
+# Supervisor o systemd debe volver a iniciar los workers cuando terminen su job.
+# La señal de reinicio requiere una caché persistente compartida con los workers.
+echo "==> Solicitando reinicio de workers de cola..."
+php artisan queue:restart --no-interaction
 
 echo "==> Deploy finalizado correctamente."
